@@ -31,6 +31,6 @@ export default tseslint.config(
   {
     // shadcn primitives export variants and hooks next to components, as upstream does.
     files: ['src/components/ui/**/*.tsx', 'src/test/**/*.tsx', 'src/**/*.test.tsx'],
-    rules: { 'react-refresh/only-export-components': 'off' },
+    rules: { 'react-refresh/only-export-components': 'off', '@typescript-eslint/consistent-type-imports': 'off' },
   },
 );
