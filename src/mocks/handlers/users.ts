@@ -26,7 +26,7 @@ const row = (u: MockUser): AdminUserRow => {
   };
 };
 
-/** Per-user safety and support counts, from those modules' data when the mock has it. */
+/** Per-user safety and support counts (the owners answer these over the bus in the API). */
 function summaries(userId: string): Pick<AdminUserDetail, 'safety' | 'support'> {
   const d = db() as unknown as {
     safety?: { flags: { userId: string; status: string; lastAt: string }[] };

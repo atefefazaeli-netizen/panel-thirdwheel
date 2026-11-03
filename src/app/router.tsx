@@ -14,6 +14,8 @@ import { searchValidator } from '@/lib/search';
 import { FlagPage } from '@/features/safety/routes/flag-page';
 import { SafetyPage } from '@/features/safety/routes/safety-page';
 import { safetySearchSchema } from '@/features/safety/schemas/safety';
+import { SupportPage } from '@/features/support/routes/support-page';
+import { supportSearchSchema } from '@/features/support/schemas/support';
 import { UserDetailPage } from '@/features/users/routes/user-detail-page';
 import { UsersListPage } from '@/features/users/routes/users-list-page';
 import { usersSearchSchema } from '@/features/users/schemas/users';
@@ -125,6 +127,26 @@ const flagRoute = createRoute({
   component: FlagPage,
 });
 
+const supportRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'support',
+  staticData: { crumb: 'Support inbox' },
+});
+const supportListRoute = createRoute({
+  getParentRoute: () => supportRoute,
+  path: '/',
+  validateSearch: searchValidator(supportSearchSchema),
+  component: SupportPage,
+});
+/** /support/<ticketId> is what support.ticket.created webhooks link to (panelUrl). */
+const ticketRoute = createRoute({
+  getParentRoute: () => supportRoute,
+  path: '$id',
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: '/support', search: { ticket: params.id, status: 'all' } });
+  },
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -133,6 +155,7 @@ export const routeTree = rootRoute.addChildren([
     reviewRoute,
     usersRoute.addChildren([usersListRoute, userDetailRoute]),
     safetyRoute.addChildren([safetyListRoute, flagRoute]),
+    supportRoute.addChildren([supportListRoute, ticketRoute]),
   ]),
 ]);
 
