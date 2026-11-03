@@ -4,6 +4,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
 import { AiEnginePage } from '@/features/ai-engine/routes/ai-engine-page';
 import { ensureSession } from '@/features/auth/api/session';
+import { IntegrationsPage } from '@/features/integrations/routes/integrations-page';
+import { integrationsSearchSchema } from '@/features/integrations/schemas/integrations';
 import { ContentImportPage } from '@/features/content/routes/content-import-page';
 import { ContentItemPage } from '@/features/content/routes/content-item-page';
 import { ContentListPage } from '@/features/content/routes/content-list-page';
@@ -155,6 +157,26 @@ const aiRoute = createRoute({
   component: AiEnginePage,
 });
 
+const settingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'settings',
+  staticData: { crumb: 'Settings' },
+});
+const settingsIndexRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/',
+  beforeLoad: () => {
+    throw redirect({ to: '/settings/integrations' });
+  },
+});
+const integrationsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'integrations',
+  staticData: { crumb: 'Integrations' },
+  validateSearch: searchValidator(integrationsSearchSchema),
+  component: IntegrationsPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -165,6 +187,7 @@ export const routeTree = rootRoute.addChildren([
     safetyRoute.addChildren([safetyListRoute, flagRoute]),
     supportRoute.addChildren([supportListRoute, ticketRoute]),
     aiRoute,
+    settingsRoute.addChildren([settingsIndexRoute, integrationsRoute]),
   ]),
 ]);
 
