@@ -2,12 +2,14 @@
 // after each case so state never leaks between them.
 import { seedAudit, type AuditEntry } from './data/audit';
 import { seedAuth, type AuthState } from './data/auth';
+import { seedContent, type ContentState } from './data/content';
 import { mockId, nowIso } from './utils';
 
 function createDb() {
   return {
     auth: seedAuth() as AuthState,
     audit: seedAudit() as AuditEntry[],
+    content: seedContent() as ContentState,
   };
 }
 
