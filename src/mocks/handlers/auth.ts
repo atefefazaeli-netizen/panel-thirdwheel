@@ -13,7 +13,9 @@ function staffFor(email: string): StaffUser {
   const key = email.toLowerCase();
   const known = db().auth.staff.get(key);
   if (known) return known;
-  const user = { userId: mockId('stf_'), email: key, roles: rolesFor(key) };
+  // A staff email that already has an account keeps its id (so SELF_ACTION can be tried).
+  const existing = [...db().users.values()].find((u) => u.account.email === key);
+  const user = { userId: existing?.account.userId ?? mockId('stf_'), email: key, roles: rolesFor(key) };
   db().auth.staff.set(key, user);
   return user;
 }

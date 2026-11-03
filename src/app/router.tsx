@@ -11,6 +11,9 @@ import { contentSearchSchema, itemSearchSchema, reviewSearchSchema } from '@/fea
 import { LoginPage } from '@/features/auth/routes/login-page';
 import { loginSearchSchema } from '@/features/auth/schemas/search';
 import { searchValidator } from '@/lib/search';
+import { UserDetailPage } from '@/features/users/routes/user-detail-page';
+import { UsersListPage } from '@/features/users/routes/users-list-page';
+import { usersSearchSchema } from '@/features/users/schemas/users';
 import { useSession } from '@/stores/session';
 import { AppLayout } from './app-layout';
 import { NotFound } from './not-found';
@@ -91,12 +94,27 @@ const reviewRoute = createRoute({
   component: ReviewQueuePage,
 });
 
+const usersRoute = createRoute({ getParentRoute: () => appRoute, path: 'users', staticData: { crumb: 'Users' } });
+const usersListRoute = createRoute({
+  getParentRoute: () => usersRoute,
+  path: '/',
+  validateSearch: searchValidator(usersSearchSchema),
+  component: UsersListPage,
+});
+const userDetailRoute = createRoute({
+  getParentRoute: () => usersRoute,
+  path: '$id',
+  staticData: { crumb: (p) => p.id ?? 'User' },
+  component: UserDetailPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
     dashboardRoute,
     contentRoute.addChildren([contentListRoute, contentImportRoute, contentItemRoute]),
     reviewRoute,
+    usersRoute.addChildren([usersListRoute, userDetailRoute]),
   ]),
 ]);
 
