@@ -17,10 +17,11 @@ import {
   type Transition,
 } from '../content-domain';
 import { daysAgo } from '../utils';
+import { uid } from './users';
 import seed from './content-seed.json';
 
-export const LEAD: Actor = { id: 'stf_lead', email: 'lead@thirdwheel.app', roles: ['admin'] };
-export const DOCTOR: Actor = { id: 'stf_doctor', email: 'dr.noor@thirdwheel.app', roles: ['clinician'] };
+export const LEAD: Actor = { id: uid('lead'), email: 'lead@thirdwheel.app', roles: ['admin'] };
+export const DOCTOR: Actor = { id: uid('doctor'), email: 'dr.noor@thirdwheel.app', roles: ['clinician'] };
 const N8N: Actor = { id: 'apikey:n8n-sheets', email: null, roles: [] };
 
 type SeedItem = {

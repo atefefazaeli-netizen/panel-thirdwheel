@@ -6,7 +6,10 @@ import type {
   AdminSubscriptionView,
   SubscriptionState,
 } from '@/features/users/api/types';
-import { daysAgo } from '../utils';
+import { daysAgo, oid } from '../utils';
+
+/** The mock's user ids: ObjectId-shaped, derived from the persona name (uid('sara')). */
+export const uid = (name: string) => oid(`user:${name}`);
 
 export interface MockUser {
   account: AdminAccountRow;
@@ -118,47 +121,47 @@ export function seedUsers(): Map<string, MockUser> {
   const add = (u: MockUser) => users.set(u.account.userId, u);
 
   add({
-    account: account('usr_sara', 'sara@example.com', 40, { tags: ['beta', 'design-partner'], providers: ['apple'] }),
+    account: account(uid('sara'), 'sara@example.com', 40, { tags: ['beta', 'design-partner'], providers: ['apple'] }),
     name: 'Sara',
-    profile: profile('usr_sara', 'Sara', 1, {
+    profile: profile(uid('sara'), 'Sara', 1, {
       city: 'Chicago',
       job: 'UX designer',
       gender: 'woman',
       sit: { dur: '1to3', kids: 'none', living: 'together' },
       togetherSince: '2024-05-01',
     }),
-    couple: { coupleId: 'cpl_sara_alex', partnerId: 'usr_alex', linkedAt: daysAgo(38) },
-    subscription: sub('usr_sara', 'plus', 21, null),
+    couple: { coupleId: 'cpl_sara_alex', partnerId: uid('alex'), linkedAt: daysAgo(38) },
+    subscription: sub(uid('sara'), 'plus', 21, null),
     tokenVersion: 0,
   });
   add({
-    account: account('usr_alex', 'alex@example.com', 38, { tags: ['beta'], providers: ['google'] }),
+    account: account(uid('alex'), 'alex@example.com', 38, { tags: ['beta'], providers: ['google'] }),
     name: 'Alex',
-    profile: profile('usr_alex', 'Alex', 2, {
+    profile: profile(uid('alex'), 'Alex', 2, {
       city: 'Chicago',
       job: 'Chef',
       gender: 'man',
       sit: { dur: '1to3', kids: 'none', living: 'together' },
       togetherSince: '2024-05-01',
     }),
-    couple: { coupleId: 'cpl_sara_alex', partnerId: 'usr_sara', linkedAt: daysAgo(38) },
-    subscription: sub('usr_alex', 'paid_by_partner', 21, null),
+    couple: { coupleId: 'cpl_sara_alex', partnerId: uid('sara'), linkedAt: daysAgo(38) },
+    subscription: sub(uid('alex'), 'paid_by_partner', 21, null),
     tokenVersion: 0,
   });
   add({
-    account: account('stf_lead', 'lead@thirdwheel.app', 60, { roles: ['admin', 'clinician'], tags: ['staff'] }),
+    account: account(uid('lead'), 'lead@thirdwheel.app', 60, { roles: ['admin', 'clinician'], tags: ['staff'] }),
     name: 'Lead',
     profile: null,
     couple: null,
-    subscription: sub('stf_lead', 'free', null, 0),
+    subscription: sub(uid('lead'), 'free', null, 0),
     tokenVersion: 0,
   });
   add({
-    account: account('stf_doctor', 'dr.noor@thirdwheel.app', 55, { roles: ['clinician'], tags: ['staff'] }),
+    account: account(uid('doctor'), 'dr.noor@thirdwheel.app', 55, { roles: ['clinician'], tags: ['staff'] }),
     name: 'Dr. Noor',
     profile: null,
     couple: null,
-    subscription: sub('stf_doctor', 'free', null, 0),
+    subscription: sub(uid('doctor'), 'free', null, 0),
     tokenVersion: 0,
   });
 
@@ -166,7 +169,7 @@ export function seedUsers(): Map<string, MockUser> {
   const tagPool = [[], [], ['press'], ['vip'], ['beta'], [], ['n8n-flagged'], ['churn-risk']];
   for (let i = 0; i < FIRST.length; i++) {
     const name = FIRST[i]!;
-    const id = `usr_${name.toLowerCase()}`;
+    const id = uid(name.toLowerCase());
     const plan = plans[i % plans.length]!;
     add({
       account: account(id, `${name.toLowerCase()}${i % 3 === 0 ? '.k' : ''}@example.com`, 2 + i * 3, {
@@ -186,7 +189,7 @@ export function seedUsers(): Map<string, MockUser> {
     });
   }
   // Link pairs of the generated accounts into couples.
-  const ids = [...users.keys()].filter((k) => k.startsWith('usr_') && k !== 'usr_sara' && k !== 'usr_alex');
+  const ids = FIRST.map((n) => uid(n.toLowerCase()));
   for (let i = 0; i + 1 < 16; i += 2) {
     const a = users.get(ids[i]!)!;
     const b = users.get(ids[i + 1]!)!;
@@ -197,14 +200,14 @@ export function seedUsers(): Map<string, MockUser> {
       b.subscription = { ...b.subscription, state: 'paid_by_partner', plus: true, renewsAt: a.subscription.renewsAt };
   }
   // A suspended spam account and an admin grant.
-  const spam = users.get('usr_sam')!;
+  const spam = users.get(uid('sam'))!;
   spam.account = { ...spam.account, suspended: true, suspendedReason: 'Spam sign-ups from one device', tags: ['spam'] };
-  const zara = users.get('usr_zara')!;
+  const zara = users.get(uid('zara'))!;
   zara.subscription = {
     ...zara.subscription,
     state: 'plus',
     plus: true,
-    grant: { until: new Date(Date.now() + 25 * 86_400_000).toISOString(), by: 'stf_lead', note: 'Podcast giveaway' },
+    grant: { until: new Date(Date.now() + 25 * 86_400_000).toISOString(), by: uid('lead'), note: 'Podcast giveaway' },
   };
   return users;
 }

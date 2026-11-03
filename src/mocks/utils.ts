@@ -66,3 +66,14 @@ export const byNewest =
     String(b[key] ?? '').localeCompare(String(a[key] ?? ''));
 
 export const clone = <T>(v: T): T => structuredClone(v);
+
+/** A stable 24-hex id (Mongo ObjectId shape, as the API's ids are) for a seed name: oid('user:sara'). */
+export function oid(seed: string): string {
+  let out = '';
+  for (let salt = 0; out.length < 24; salt++) {
+    let h = 0x811c9dc5 ^ salt;
+    for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193);
+    out += (h >>> 0).toString(16).padStart(8, '0');
+  }
+  return `6${out.slice(1, 24)}`;
+}

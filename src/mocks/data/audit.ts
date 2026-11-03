@@ -1,4 +1,5 @@
 import { daysAgo } from '../utils';
+import { uid } from './users';
 
 export interface AuditEntry {
   id: string;
@@ -13,7 +14,7 @@ export interface AuditEntry {
 export function seedAudit(): AuditEntry[] {
   const rows: Omit<AuditEntry, 'id'>[] = [
     {
-      actor: 'stf_lead',
+      actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
       action: 'content.submit',
       target: 'content:my-perfect-day',
@@ -21,7 +22,7 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(0, 3),
     },
     {
-      actor: 'stf_doctor',
+      actor: uid('doctor'),
       actorEmail: 'dr.noor@thirdwheel.app',
       action: 'content.request_changes',
       target: 'content:money-date-30-minutes',
@@ -29,10 +30,10 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(1, 2),
     },
     {
-      actor: 'stf_lead',
+      actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
       action: 'user.plus_grant',
-      target: 'user:usr_sara',
+      target: `user:${uid('sara')}`,
       meta: { days: 30 },
       at: daysAgo(2),
     },
@@ -45,7 +46,7 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(3),
     },
     {
-      actor: 'stf_lead',
+      actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
       action: 'webhook.create',
       target: 'webhook:wh_crisis',
@@ -53,7 +54,7 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(6),
     },
     {
-      actor: 'stf_doctor',
+      actor: uid('doctor'),
       actorEmail: 'dr.noor@thirdwheel.app',
       action: 'safety.review',
       target: 'flag:flg_0003',
@@ -61,7 +62,7 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(4),
     },
     {
-      actor: 'stf_lead',
+      actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
       action: 'ai.settings_update',
       target: 'ai:settings',
@@ -69,10 +70,10 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(5),
     },
     {
-      actor: 'stf_lead',
+      actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
       action: 'user.suspend',
-      target: 'user:usr_spam1',
+      target: `user:${uid('sam')}`,
       meta: { reason: 'Spam sign-ups' },
       at: daysAgo(8),
     },

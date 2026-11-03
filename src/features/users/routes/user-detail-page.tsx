@@ -244,7 +244,9 @@ function UserDetail() {
               <CardDescription>Metadata only. Thirdwheel never stores what was typed.</CardDescription>
               <CardAction>
                 <Button variant="outline" size="sm" asChild>
-                  <a href={`/safety?userId=${encodeURIComponent(account.userId)}`}>View flags</a>
+                  <Link to="/safety" search={{ userId: account.userId }}>
+                    View flags
+                  </Link>
                 </Button>
               </CardAction>
             </CardHeader>
