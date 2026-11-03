@@ -30,7 +30,14 @@ export const usersColumns = h.columns([
   h.accessor('plan', {
     header: 'Plan',
     meta: { label: 'Plan' },
-    cell: (c) => <StatusBadge status={c.getValue()} label={PLAN_LABEL[c.getValue()]} dot={false} />,
+    cell: (c) => {
+      const plan = c.getValue();
+      return plan ? (
+        <StatusBadge status={plan} label={PLAN_LABEL[plan]} dot={false} />
+      ) : (
+        <span className="text-sm text-muted-foreground">Not available</span>
+      );
+    },
   }),
   h.accessor('partner', {
     header: 'Partner',
@@ -42,7 +49,9 @@ export const usersColumns = h.columns([
           {c.getValue()!.name ?? c.getValue()!.userId}
         </span>
       ) : (
-        <span className="text-sm text-muted-foreground">Not linked</span>
+        <span className="text-sm text-muted-foreground">
+          {c.row.original.linked === null ? 'Not available' : 'Not linked'}
+        </span>
       ),
   }),
   h.accessor('suspended', {

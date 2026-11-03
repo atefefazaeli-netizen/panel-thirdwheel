@@ -251,13 +251,17 @@ function UserDetail() {
               </CardAction>
             </CardHeader>
             <CardContent>
-              <Fields
-                rows={[
-                  ['Open flags', String(safety.open)],
-                  ['All flags', String(safety.total)],
-                  ['Last flag', safety.lastAt ? formatRelative(safety.lastAt) : 'Never'],
-                ]}
-              />
+              {safety ? (
+                <Fields
+                  rows={[
+                    ['Open flags', String(safety.open)],
+                    ['All flags', String(safety.total)],
+                    ['Last flag', safety.lastAt ? formatRelative(safety.lastAt) : 'Never'],
+                  ]}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Not available: the safety service did not answer.</p>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -275,12 +279,16 @@ function UserDetail() {
               </CardAction>
             </CardHeader>
             <CardContent>
-              <Fields
-                rows={[
-                  ['Open tickets', String(support.open)],
-                  ['All tickets', String(support.total)],
-                ]}
-              />
+              {support ? (
+                <Fields
+                  rows={[
+                    ['Open tickets', String(support.open)],
+                    ['All tickets', String(support.total)],
+                  ]}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Not available: the support service did not answer.</p>
+              )}
             </CardContent>
           </Card>
         </div>
