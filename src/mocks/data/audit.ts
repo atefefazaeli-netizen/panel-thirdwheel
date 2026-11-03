@@ -1,4 +1,4 @@
-import { daysAgo } from '../utils';
+import { daysAgo, oid } from '../utils';
 import { uid } from './users';
 
 export interface AuditEntry {
@@ -41,15 +41,15 @@ export function seedAudit(): AuditEntry[] {
       actor: 'apikey:n8n-sheets',
       actorEmail: null,
       action: 'content.import',
-      target: 'content:*',
-      meta: { created: 1, updated: 2 },
+      target: 'content:import',
+      meta: { created: 1, updated: 2, rejected: 0, source: 'n8n' },
       at: daysAgo(3),
     },
     {
       actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
       action: 'webhook.create',
-      target: 'webhook:wh_crisis',
+      target: `webhook:${oid('wh:crisis')}`,
       meta: { events: ['crisis.alert'] },
       at: daysAgo(6),
     },
@@ -57,15 +57,15 @@ export function seedAudit(): AuditEntry[] {
       actor: uid('doctor'),
       actorEmail: 'dr.noor@thirdwheel.app',
       action: 'safety.review',
-      target: 'flag:flg_0003',
+      target: `safety_flag:${oid('flag:4')}`,
       meta: {},
       at: daysAgo(4),
     },
     {
       actor: uid('lead'),
       actorEmail: 'lead@thirdwheel.app',
-      action: 'ai.settings_update',
-      target: 'ai:settings',
+      action: 'ai.settings.update',
+      target: 'ai-settings:3',
       meta: { version: 3 },
       at: daysAgo(5),
     },

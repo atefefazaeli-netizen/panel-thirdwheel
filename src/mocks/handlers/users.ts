@@ -244,7 +244,7 @@ export const usersHandlers = [
     onUser(request, params.id, {}, (u, me) => {
       u.subscription = { ...u.subscription, grant: null };
       syncPlus(u);
-      recordAudit(me, 'user.plus_end', `user:${u.account.userId}`);
+      recordAudit(me, 'user.plus_revoke', `user:${u.account.userId}`);
       return HttpResponse.json(u.subscription);
     }),
   ),

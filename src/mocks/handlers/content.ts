@@ -240,7 +240,7 @@ export const contentHandlers = [
     step(
       request,
       'admin',
-      'content.draft_save',
+      'content.draft.save',
       (i, me, b) => saveDraft(i, b.snapshot, actorOf(me), nowIso()),
       String(params.id),
     ),
@@ -249,7 +249,7 @@ export const contentHandlers = [
     step(
       request,
       'admin',
-      'content.draft_discard',
+      'content.draft.discard',
       (i, me) => discardDraft(i, actorOf(me), nowIso()),
       String(params.id),
     ),
