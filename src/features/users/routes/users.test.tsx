@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { uid } from '@/mocks/data/users';
 import { db } from '@/mocks/db';
 import { renderRoute } from '@/test/utils';
 
@@ -20,7 +21,7 @@ describe('users (mock API)', () => {
 
   it('suspends with a reason and shows the banner', async () => {
     const user = userEvent.setup();
-    renderRoute('/users/usr_maya');
+    renderRoute(`/users/${uid('maya')}`);
     await user.click(await screen.findByRole('button', { name: 'Actions' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Suspend' }));
     const dialog = await screen.findByRole('dialog');
@@ -29,7 +30,7 @@ describe('users (mock API)', () => {
     await user.type(within(dialog).getByRole('textbox'), 'Harassment reports');
     await user.click(within(dialog).getByRole('button', { name: 'Suspend' }));
     expect(await screen.findByText(/Harassment reports/)).toBeInTheDocument();
-    expect(db().users.get('usr_maya')!.account.suspended).toBe(true);
+    expect(db().users.get(uid('maya'))!.account.suspended).toBe(true);
   });
 
   it('grants Plus to a linked account and carries it to the partner', async () => {
@@ -55,14 +56,14 @@ describe('users (mock API)', () => {
 
   it('deletes only after the email is typed', async () => {
     const user = userEvent.setup();
-    renderRoute('/users/usr_omar');
+    renderRoute(`/users/${uid('omar')}`);
     await user.click(await screen.findByRole('button', { name: 'Actions' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete account' }));
     const dialog = await screen.findByRole('alertdialog');
     const del = within(dialog).getByRole('button', { name: 'Delete account' });
     expect(del).toBeDisabled();
-    await user.type(within(dialog).getByRole('textbox'), db().users.get('usr_omar')!.account.email!);
+    await user.type(within(dialog).getByRole('textbox'), db().users.get(uid('omar'))!.account.email!);
     await user.click(del);
-    await waitFor(() => expect(db().users.has('usr_omar')).toBe(false));
+    await waitFor(() => expect(db().users.has(uid('omar'))).toBe(false));
   });
 });

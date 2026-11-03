@@ -11,6 +11,9 @@ import { contentSearchSchema, itemSearchSchema, reviewSearchSchema } from '@/fea
 import { LoginPage } from '@/features/auth/routes/login-page';
 import { loginSearchSchema } from '@/features/auth/schemas/search';
 import { searchValidator } from '@/lib/search';
+import { FlagPage } from '@/features/safety/routes/flag-page';
+import { SafetyPage } from '@/features/safety/routes/safety-page';
+import { safetySearchSchema } from '@/features/safety/schemas/safety';
 import { UserDetailPage } from '@/features/users/routes/user-detail-page';
 import { UsersListPage } from '@/features/users/routes/users-list-page';
 import { usersSearchSchema } from '@/features/users/schemas/users';
@@ -108,6 +111,20 @@ const userDetailRoute = createRoute({
   component: UserDetailPage,
 });
 
+const safetyRoute = createRoute({ getParentRoute: () => appRoute, path: 'safety', staticData: { crumb: 'Safety' } });
+const safetyListRoute = createRoute({
+  getParentRoute: () => safetyRoute,
+  path: '/',
+  validateSearch: searchValidator(safetySearchSchema),
+  component: SafetyPage,
+});
+const flagRoute = createRoute({
+  getParentRoute: () => safetyRoute,
+  path: '$id',
+  staticData: { crumb: 'Flag' },
+  component: FlagPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -115,6 +132,7 @@ export const routeTree = rootRoute.addChildren([
     contentRoute.addChildren([contentListRoute, contentImportRoute, contentItemRoute]),
     reviewRoute,
     usersRoute.addChildren([usersListRoute, userDetailRoute]),
+    safetyRoute.addChildren([safetyListRoute, flagRoute]),
   ]),
 ]);
 

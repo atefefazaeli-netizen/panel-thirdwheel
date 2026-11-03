@@ -3,15 +3,19 @@
 import { seedAudit, type AuditEntry } from './data/audit';
 import { seedAuth, type AuthState } from './data/auth';
 import { seedContent, type ContentState } from './data/content';
+import { seedSafety, type SafetyState } from './data/safety';
 import { seedUsers, type MockUser } from './data/users';
 import { mockId, nowIso } from './utils';
 
 function createDb() {
+  const users = seedUsers();
+  const emailOf = (id: string) => users.get(id)?.account.email ?? null;
   return {
     auth: seedAuth() as AuthState,
     audit: seedAudit() as AuditEntry[],
     content: seedContent() as ContentState,
-    users: seedUsers() as Map<string, MockUser>,
+    users: users as Map<string, MockUser>,
+    safety: seedSafety(emailOf) as SafetyState,
   };
 }
 
