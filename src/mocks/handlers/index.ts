@@ -1,3 +1,4 @@
+import { adminHandlers } from './admin';
 import { aiHandlers } from './ai';
 import { authHandlers } from './auth';
 import { contentHandlers } from './content';
@@ -9,6 +10,7 @@ import { usersHandlers } from './users';
 
 export const handlers = [
   ...authHandlers,
+  ...adminHandlers,
   ...contentHandlers,
   ...usersHandlers,
   ...safetyHandlers,

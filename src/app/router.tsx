@@ -3,7 +3,10 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
 import { AiEnginePage } from '@/features/ai-engine/routes/ai-engine-page';
+import { AuditPage } from '@/features/audit/routes/audit-page';
+import { auditSearchSchema } from '@/features/audit/schemas/audit';
 import { ensureSession } from '@/features/auth/api/session';
+import { DashboardPage } from '@/features/dashboard/routes/dashboard-page';
 import { IntegrationsPage } from '@/features/integrations/routes/integrations-page';
 import { integrationsSearchSchema } from '@/features/integrations/schemas/integrations';
 import { ContentImportPage } from '@/features/content/routes/content-import-page';
@@ -29,7 +32,6 @@ import { useSession } from '@/stores/session';
 import { AppLayout } from './app-layout';
 import { NotFound } from './not-found';
 import { PendingPage } from './pending';
-import { DashboardPage } from './placeholder-dashboard';
 
 export interface RouterContext {
   queryClient: QueryClient;
@@ -195,6 +197,14 @@ const experiencesRoute = createRoute({
   component: ExperiencesPage,
 });
 
+const auditRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'audit',
+  staticData: { crumb: 'Audit log' },
+  validateSearch: searchValidator(auditSearchSchema),
+  component: AuditPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -208,6 +218,7 @@ export const routeTree = rootRoute.addChildren([
     settingsRoute.addChildren([settingsIndexRoute, integrationsRoute]),
     catalogRoute,
     experiencesRoute,
+    auditRoute,
   ]),
 ]);
 
