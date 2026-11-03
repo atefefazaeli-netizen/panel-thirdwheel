@@ -25,3 +25,8 @@ npm-debug.log*
 playwright-report/
 test-results/
 *.tsbuildinfo
+
+# agent skills installed locally with `npx skills add shadcn/ui` (third-party docs, not vendored)
+.agents/
+.claude/
+skills-lock.json
