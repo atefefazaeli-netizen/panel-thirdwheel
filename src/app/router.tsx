@@ -3,6 +3,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
 import { ensureSession } from '@/features/auth/api/session';
+import { ContentImportPage } from '@/features/content/routes/content-import-page';
+import { ContentItemPage } from '@/features/content/routes/content-item-page';
+import { ContentListPage } from '@/features/content/routes/content-list-page';
+import { ReviewQueuePage } from '@/features/content/routes/review-queue-page';
+import { contentSearchSchema, itemSearchSchema, reviewSearchSchema } from '@/features/content/schemas/search';
 import { LoginPage } from '@/features/auth/routes/login-page';
 import { loginSearchSchema } from '@/features/auth/schemas/search';
 import { searchValidator } from '@/lib/search';
@@ -58,7 +63,42 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
-export const routeTree = rootRoute.addChildren([loginRoute, appRoute.addChildren([dashboardRoute])]);
+const contentRoute = createRoute({ getParentRoute: () => appRoute, path: 'content', staticData: { crumb: 'Content' } });
+const contentListRoute = createRoute({
+  getParentRoute: () => contentRoute,
+  path: '/',
+  validateSearch: searchValidator(contentSearchSchema),
+  component: ContentListPage,
+});
+const contentImportRoute = createRoute({
+  getParentRoute: () => contentRoute,
+  path: 'import',
+  staticData: { crumb: 'Import' },
+  component: ContentImportPage,
+});
+const contentItemRoute = createRoute({
+  getParentRoute: () => contentRoute,
+  path: '$id',
+  staticData: { crumb: (p) => p.id ?? 'Item' },
+  validateSearch: searchValidator(itemSearchSchema),
+  component: ContentItemPage,
+});
+const reviewRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'review',
+  staticData: { crumb: 'Review queue' },
+  validateSearch: searchValidator(reviewSearchSchema),
+  component: ReviewQueuePage,
+});
+
+export const routeTree = rootRoute.addChildren([
+  loginRoute,
+  appRoute.addChildren([
+    dashboardRoute,
+    contentRoute.addChildren([contentListRoute, contentImportRoute, contentItemRoute]),
+    reviewRoute,
+  ]),
+]);
 
 export function createAppRouter(
   queryClient: QueryClient,
