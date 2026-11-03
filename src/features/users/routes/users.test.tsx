@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { uid } from '@/mocks/data/users';
@@ -65,5 +65,51 @@ describe('users (mock API)', () => {
     await user.type(within(dialog).getByRole('textbox'), db().users.get(uid('omar'))!.account.email!);
     await user.click(del);
     await waitFor(() => expect(db().users.has(uid('omar'))).toBe(false));
+  });
+});
+
+describe('users when an owner module fails (null parts)', () => {
+  it('shows Not available for a null plan and null safety and support summaries', async () => {
+    const { http, HttpResponse } = await import('msw');
+    const { server } = await import('@/mocks/node');
+    const { p } = await import('@/mocks/utils');
+    server.use(
+      http.get(p('admin/users'), () =>
+        HttpResponse.json({
+          items: [
+            {
+              userId: uid('sara'),
+              email: 'sara@example.com',
+              name: null,
+              createdAt: '2026-10-01T00:00:00Z',
+              plan: null,
+              plus: null,
+              linked: null,
+              partner: null,
+              suspended: false,
+              tags: [],
+            },
+          ],
+          meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+        }),
+      ),
+      http.get(p('admin/users/:id'), () =>
+        HttpResponse.json({
+          account: db().users.get(uid('sara'))!.account,
+          profile: null,
+          couple: null,
+          subscription: null,
+          safety: null,
+          support: null,
+        }),
+      ),
+    );
+    renderRoute('/users');
+    const table = await screen.findByRole('table', { name: 'Users' });
+    expect(await within(table).findAllByText('Not available')).toHaveLength(2);
+    cleanup();
+    renderRoute(`/users/${uid('sara')}`);
+    expect(await screen.findByText('Not available: the safety service did not answer.')).toBeInTheDocument();
+    expect(screen.getByText('Not available: the support service did not answer.')).toBeInTheDocument();
   });
 });

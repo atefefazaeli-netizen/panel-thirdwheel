@@ -3,14 +3,15 @@
 export type SubscriptionState = 'free' | 'plus' | 'paid_by_partner' | 'cancelled' | 'payment_problem';
 export const PLANS: readonly SubscriptionState[] = ['free', 'plus', 'paid_by_partner', 'cancelled', 'payment_problem'];
 
+/** `name`, `plan`, `plus` and `linked` read null when their owner module did not answer. */
 export interface AdminUserRow {
   userId: string;
   email: string | null;
   name: string | null;
   createdAt: string;
-  plan: SubscriptionState;
-  plus: boolean;
-  linked: boolean;
+  plan: SubscriptionState | null;
+  plus: boolean | null;
+  linked: boolean | null;
   partner: { userId: string; name: string | null } | null;
   suspended: boolean;
   tags: string[];
@@ -54,6 +55,7 @@ export interface AdminSubscriptionView {
   experiencesUsed: number | null;
 }
 
+/** Each part other than `account` reads null when its owner fails or has no handler yet. */
 export interface AdminUserDetail {
   account: AdminAccountRow;
   profile: AdminProfileView | null;
@@ -63,8 +65,8 @@ export interface AdminUserDetail {
     partner: { userId: string; name: string | null; email: string | null };
   } | null;
   subscription: AdminSubscriptionView | null;
-  safety: { open: number; total: number; lastAt: string | null };
-  support: { total: number; open: number };
+  safety: { open: number; total: number; lastAt: string | null } | null;
+  support: { total: number; open: number } | null;
 }
 
 export interface UserListQuery {

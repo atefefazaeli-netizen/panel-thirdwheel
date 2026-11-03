@@ -120,7 +120,7 @@ function syncPlus(u: MockUser) {
       ...partner.subscription,
       plus,
       state: plus ? 'paid_by_partner' : 'free',
-      renewsAt: plus ? (u.subscription.grant?.until ?? u.subscription.renewsAt) : null,
+      // renewsAt stays the partner's own store plan (ADMIN_API.md › Changes from v1).
     };
     emitMockEvent('user.subscription.changed', {
       userId: partner.account.userId,
@@ -235,7 +235,11 @@ export const usersHandlers = [
         },
       };
       syncPlus(u);
-      recordAudit(me, 'user.plus_grant', `user:${u.account.userId}`, { days });
+      recordAudit(me, 'user.plus_grant', `user:${u.account.userId}`, {
+        days,
+        until: u.subscription.grant?.until,
+        note: u.subscription.grant?.note ?? null,
+      });
       return HttpResponse.json(u.subscription);
     }),
   ),
@@ -252,7 +256,7 @@ export const usersHandlers = [
   http.post(p('admin/users/:id/unlink'), ({ request, params }) =>
     onUser(request, params.id, {}, (u, me) => {
       const unlinked = unlinkCouple(u);
-      if (unlinked) recordAudit(me, 'user.unlink', `user:${u.account.userId}`);
+      recordAudit(me, 'user.unlink', `user:${u.account.userId}`, { unlinked });
       return HttpResponse.json({ unlinked });
     }),
   ),
