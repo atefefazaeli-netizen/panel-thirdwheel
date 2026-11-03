@@ -6,7 +6,6 @@ import {
   HeartIcon,
   LibraryBigIcon,
   LifeBuoyIcon,
-  UserXIcon,
   UsersIcon,
   WebhookIcon,
 } from 'lucide-react';
@@ -40,7 +39,14 @@ export function DashboardPage() {
             value={s?.accounts}
             loading={loading}
             icon={UsersIcon}
-            hint={s?.signups7d != null ? `${s.signups7d} new this week` : undefined}
+            hint={
+              [
+                s?.signups7d != null && `${s.signups7d} new this week`,
+                s?.suspended != null && `${s.suspended} suspended`,
+              ]
+                .filter(Boolean)
+                .join(' · ') || undefined
+            }
             to={isAdmin ? '/users' : undefined}
           />
           <StatCard label="Couples" value={s?.couples} loading={loading} icon={HeartIcon} tone="brand" />
@@ -52,7 +58,6 @@ export function DashboardPage() {
             tone="success"
             hint={s?.grants != null ? `${s.grants} by admin grant` : undefined}
           />
-          <StatCard label="Suspended" value={s?.suspended} loading={loading} icon={UserXIcon} />
           <StatCard
             label="Live content"
             value={s?.content ? s.content.live : s === undefined ? undefined : null}

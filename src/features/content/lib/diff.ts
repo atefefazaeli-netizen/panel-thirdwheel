@@ -40,9 +40,26 @@ const labelOf = (path: string) =>
     .replace(/\[(\d+)\]/g, (_, i: string) => ` ${Number(i) + 1}`)
     .replace(/\./g, ' › ');
 
+/** Main text of a card, step or round, when it has one. */
+const mainOf = (v: unknown): { main: string; rest: Record<string, unknown> } | null => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const key = MAIN_KEYS.find((k) => typeof o[k] === 'string');
+  return key
+    ? { main: o[key] as string, rest: Object.fromEntries(Object.entries(o).filter(([k]) => k !== key)) }
+    : null;
+};
+
 function row(path: string, a: unknown, b: unknown): DiffRow {
-  const before = fmt(a);
-  const after = fmt(b);
+  let before = fmt(a);
+  let after = fmt(b);
+  // Only the text changed (the card's other fields match): show just the text on both sides.
+  const ma = mainOf(a);
+  const mb = mainOf(b);
+  if (ma && mb && ma.main !== mb.main && compact(ma.rest) === compact(mb.rest)) {
+    before = ma.main;
+    after = mb.main;
+  }
   const kind: DiffKind = before === after ? 'same' : before === null ? 'added' : after === null ? 'removed' : 'changed';
   return { path, label: labelOf(path), before, after, kind };
 }

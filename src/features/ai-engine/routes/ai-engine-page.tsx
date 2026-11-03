@@ -12,6 +12,7 @@ import { Form } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { useRoles } from '@/stores/session';
 import { useAiHistory, useAiSettings, useSaveAiSettings } from '../api/queries';
 import type { AiSettingsView } from '../api/types';
@@ -87,7 +88,13 @@ function Settings({ view }: { view: AiSettingsView }) {
               <PromptsCard view={view} readOnly={readOnly} />
             </fieldset>
             <RoleGate allow="admin">
-              <Card className="sticky bottom-3 z-10 bg-card/95 py-3 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85">
+              <Card
+                className={cn(
+                  'py-3',
+                  isDirty &&
+                    'sticky bottom-3 z-10 bg-card/95 shadow-md backdrop-blur supports-[backdrop-filter]:bg-card/85',
+                )}
+              >
                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <FormFieldText
                     control={form.control}

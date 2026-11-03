@@ -164,7 +164,11 @@ export function WebhooksTab({ onShowDeliveries }: { onShowDeliveries: (webhookId
                     <Label htmlFor={`enabled-${w.id}`}>Enabled</Label>
                   </div>
                 </div>
-                <Button variant="link" className="h-auto self-start p-0 text-sm" onClick={() => onShowDeliveries(w.id)}>
+                <Button
+                  variant="link"
+                  className="h-auto self-start p-0 text-sm text-info underline"
+                  onClick={() => onShowDeliveries(w.id)}
+                >
                   Deliveries for this webhook
                 </Button>
               </CardContent>

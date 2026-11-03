@@ -1,6 +1,7 @@
-import type * as React from 'react';
+import * as React from 'react';
 import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { useSidebarStore } from '@/stores/sidebar';
 import type { StaffUser } from '@/stores/session';
 import { AppSidebar, type NavBadges } from './app-sidebar';
@@ -19,8 +20,13 @@ export interface AppShellProps {
 
 /** Sidebar + top bar (breadcrumbs, theme, account) + page content. */
 export function AppShell({ user, badges, onSignOut, banner, children }: AppShellProps) {
-  const open = useSidebarStore((s) => s.open);
-  const setOpen = useSidebarStore((s) => s.setOpen);
+  const storedOpen = useSidebarStore((s) => s.open);
+  const setStoredOpen = useSidebarStore((s) => s.setOpen);
+  // Tablets start with the icon rail so tables get the width; the saved choice is for desktop.
+  const tablet = useMediaQuery('(min-width: 768px) and (max-width: 1199px)');
+  const [tabletOpen, setTabletOpen] = React.useState(false);
+  const open = tablet ? tabletOpen : storedOpen;
+  const setOpen = tablet ? setTabletOpen : setStoredOpen;
   const openMobile = useSidebarStore((s) => s.openMobile);
   const setOpenMobile = useSidebarStore((s) => s.setOpenMobile);
 
