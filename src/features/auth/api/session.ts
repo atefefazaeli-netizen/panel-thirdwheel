@@ -15,20 +15,38 @@ export function ensureSession(): Promise<void> {
   return restoring;
 }
 
+/** Waits before retrying a restore that hit a busy (429) or unavailable (5xx, network) API. */
+const RESTORE_WAITS_MS = [1000, 3000];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** True for a failure worth retrying: rate limited, server error or no network. */
+function isTransient(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return true;
+  return e.status == null || e.status === 429 || e.status >= 500;
+}
+
 async function restore(): Promise<void> {
   if (!getRefreshToken()) {
     useSession.getState().signOut(null);
     return;
   }
-  try {
-    if (!(await refreshSession())) {
-      useSession.getState().signOut(null);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      if (!(await refreshSession())) {
+        useSession.getState().signOut(null);
+        return;
+      }
+      await loadStaff();
       return;
+    } catch (e) {
+      // A busy or briefly unreachable API keeps the tokens and tries again; after that, ask for
+      // a fresh sign-in rather than showing a broken panel.
+      if (!isTransient(e) || attempt >= RESTORE_WAITS_MS.length) {
+        useSession.getState().signOut(null);
+        return;
+      }
+      await sleep(RESTORE_WAITS_MS[attempt]);
     }
-    await loadStaff();
-  } catch {
-    // API unreachable: ask for a fresh sign-in rather than showing a broken panel.
-    useSession.getState().signOut(null);
   }
 }
 
