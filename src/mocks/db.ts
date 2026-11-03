@@ -3,6 +3,7 @@
 import { seedAudit, type AuditEntry } from './data/audit';
 import { seedAuth, type AuthState } from './data/auth';
 import { seedContent, type ContentState } from './data/content';
+import { seedUsers, type MockUser } from './data/users';
 import { mockId, nowIso } from './utils';
 
 function createDb() {
@@ -10,6 +11,7 @@ function createDb() {
     auth: seedAuth() as AuthState,
     audit: seedAudit() as AuditEntry[],
     content: seedContent() as ContentState,
+    users: seedUsers() as Map<string, MockUser>,
   };
 }
 
