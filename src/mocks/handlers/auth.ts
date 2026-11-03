@@ -38,6 +38,14 @@ export const authHandlers = [
     return HttpResponse.json({ ok: true, session, resendAt: Date.now() + 30_000 });
   }),
 
+  http.post(p('auth/signup/start'), async ({ request }) => {
+    const { email } = await readJson<{ email?: string }>(request);
+    if (!email || !EMAIL_RE.test(email)) return badRequest('Send a valid email or phone');
+    const session = `otp_${randomToken(20)}`;
+    db().auth.otps.set(session, { email: email.toLowerCase(), attempts: 0, locked: false });
+    return HttpResponse.json({ ok: true, session, resendAt: Date.now() + 30_000 });
+  }),
+
   http.post(p('auth/resend'), async ({ request }) => {
     const { session } = await readJson<{ session?: string }>(request);
     const otp = session ? db().auth.otps.get(session) : undefined;

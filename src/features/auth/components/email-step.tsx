@@ -20,7 +20,7 @@ export function EmailStep({
     resolver: zodResolver(emailSchema),
     defaultValues: { email: defaultEmail ?? '' },
   });
-  const start = useMutation({ mutationFn: (email: string) => authApi.startLogin(email), meta: { silent: true } });
+  const start = useMutation({ mutationFn: (email: string) => authApi.start(email), meta: { silent: true } });
 
   const submit = form.handleSubmit(async ({ email }) => {
     try {
@@ -28,10 +28,7 @@ export function EmailStep({
       if (r.ok) onSent(email, r.session, r.resendAt);
       else
         form.setError('email', {
-          message:
-            r.reason === 'not_found'
-              ? 'No Thirdwheel account uses this email.'
-              : 'Could not send a code to this email.',
+          message: 'Could not send a code to this email.',
         });
     } catch (e) {
       form.setError('email', { message: errorMessage(e) });
