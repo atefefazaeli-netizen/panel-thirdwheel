@@ -22,6 +22,9 @@ import { supportSearchSchema } from '@/features/support/schemas/support';
 import { UserDetailPage } from '@/features/users/routes/user-detail-page';
 import { UsersListPage } from '@/features/users/routes/users-list-page';
 import { usersSearchSchema } from '@/features/users/schemas/users';
+import { CatalogPage } from '@/features/legacy-catalog/routes/catalog-page';
+import { ExperiencesPage } from '@/features/legacy-catalog/routes/experiences-page';
+import { catalogSearchSchema, experienceSearchSchema } from '@/features/legacy-catalog/schemas/legacy';
 import { useSession } from '@/stores/session';
 import { AppLayout } from './app-layout';
 import { NotFound } from './not-found';
@@ -177,6 +180,21 @@ const integrationsRoute = createRoute({
   component: IntegrationsPage,
 });
 
+const catalogRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'catalog',
+  staticData: { crumb: 'Date ideas (legacy)' },
+  validateSearch: searchValidator(catalogSearchSchema),
+  component: CatalogPage,
+});
+const experiencesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'experiences',
+  staticData: { crumb: 'Experiences (legacy)' },
+  validateSearch: searchValidator(experienceSearchSchema),
+  component: ExperiencesPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -188,6 +206,8 @@ export const routeTree = rootRoute.addChildren([
     supportRoute.addChildren([supportListRoute, ticketRoute]),
     aiRoute,
     settingsRoute.addChildren([settingsIndexRoute, integrationsRoute]),
+    catalogRoute,
+    experiencesRoute,
   ]),
 ]);
 
