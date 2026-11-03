@@ -268,7 +268,9 @@ function UserDetail() {
               </CardTitle>
               <CardAction>
                 <Button variant="outline" size="sm" asChild>
-                  <a href="/support">Open inbox</a>
+                  <Link to="/support" search={{ status: 'all' }}>
+                    Open inbox
+                  </Link>
                 </Button>
               </CardAction>
             </CardHeader>
