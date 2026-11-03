@@ -16,6 +16,8 @@ export interface JsonEditorProps {
   /** Called with the parsed value whenever the text is valid. */
   onValidChange?: (value: unknown) => void;
   readOnly?: boolean;
+  /** An empty field is fine (no value). */
+  allowEmpty?: boolean;
   rows?: number;
   description?: React.ReactNode;
   className?: string;
@@ -30,23 +32,25 @@ export function JsonEditor({
   validate,
   onValidChange,
   readOnly,
+  allowEmpty,
   rows = 16,
   description,
   className,
 }: JsonEditorProps) {
   const autoId = React.useId();
   const fieldId = id ?? autoId;
+  const empty = allowEmpty && !value.trim();
   const parsed = React.useMemo(() => parseJson(value), [value]);
   const issues = React.useMemo(() => (parsed.ok && validate ? validate(parsed.value) : []), [parsed, validate]);
-  const valid = parsed.ok && issues.length === 0;
+  const valid = empty || (parsed.ok && issues.length === 0);
 
   const onValidRef = React.useRef(onValidChange);
   React.useEffect(() => {
     onValidRef.current = onValidChange;
   }, [onValidChange]);
   React.useEffect(() => {
-    if (valid) onValidRef.current?.(parsed.value);
-  }, [valid, parsed]);
+    if (valid && !empty) onValidRef.current?.(parsed.value);
+  }, [valid, empty, parsed]);
 
   const format = () => {
     if (parsed.ok) onChange(JSON.stringify(parsed.value, null, 2));
