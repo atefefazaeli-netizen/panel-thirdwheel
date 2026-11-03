@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+package-lock.json
+public/mockServiceWorker.js
+.agents
+.claude
+skills-lock.json
+src/mocks/data/*.json
