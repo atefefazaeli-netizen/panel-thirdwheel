@@ -40,3 +40,14 @@ export function useRoles() {
   const user = useSession((s) => s.user);
   return { user, isAdmin: hasRole(user, 'admin'), isClinician: hasRole(user, 'clinician') };
 }
+
+/** True when the user holds at least one of the roles. */
+export function canAccess(user: StaffUser | null | undefined, allow: StaffRole | StaffRole[]): boolean {
+  const roles = Array.isArray(allow) ? allow : [allow];
+  return roles.some((r) => hasRole(user, r));
+}
+
+export function useCan(allow: StaffRole | StaffRole[]): boolean {
+  const user = useSession((s) => s.user);
+  return canAccess(user, allow);
+}
