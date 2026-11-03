@@ -2,6 +2,7 @@
 // in the URL (shareable, back/forward friendly). Auth guards run in beforeLoad.
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
+import { AiEnginePage } from '@/features/ai-engine/routes/ai-engine-page';
 import { ensureSession } from '@/features/auth/api/session';
 import { ContentImportPage } from '@/features/content/routes/content-import-page';
 import { ContentItemPage } from '@/features/content/routes/content-item-page';
@@ -147,6 +148,13 @@ const ticketRoute = createRoute({
   },
 });
 
+const aiRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'ai-engine',
+  staticData: { crumb: 'AI engine' },
+  component: AiEnginePage,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -156,6 +164,7 @@ export const routeTree = rootRoute.addChildren([
     usersRoute.addChildren([usersListRoute, userDetailRoute]),
     safetyRoute.addChildren([safetyListRoute, flagRoute]),
     supportRoute.addChildren([supportListRoute, ticketRoute]),
+    aiRoute,
   ]),
 ]);
 

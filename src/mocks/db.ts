@@ -1,5 +1,6 @@
 // The mock API's in-memory database. Every handler reads and writes here; tests call resetDb()
 // after each case so state never leaks between them.
+import { seedAi, type AiState } from './data/ai';
 import { seedAudit, type AuditEntry } from './data/audit';
 import { seedAuth, type AuthState } from './data/auth';
 import { seedContent, type ContentState } from './data/content';
@@ -18,6 +19,7 @@ function createDb() {
     users: users as Map<string, MockUser>,
     safety: seedSafety(emailOf) as SafetyState,
     support: seedSupport() as SupportState,
+    ai: seedAi() as AiState,
   };
 }
 
