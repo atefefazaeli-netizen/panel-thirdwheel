@@ -7,3 +7,4 @@ public/mockServiceWorker.js
 .claude
 skills-lock.json
 src/mocks/data/*.json
+docs/API_CONTRACT.md
