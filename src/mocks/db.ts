@@ -5,6 +5,7 @@ import { seedAudit, type AuditEntry } from './data/audit';
 import { seedAuth, type AuthState } from './data/auth';
 import { seedContent, type ContentState } from './data/content';
 import { seedIntegrations, type IntegrationsState } from './data/integrations';
+import { seedLegacy, type LegacyState } from './data/legacy';
 import { seedSafety, type SafetyState } from './data/safety';
 import { seedSupport, type SupportState } from './data/support';
 import { seedUsers, type MockUser } from './data/users';
@@ -22,6 +23,7 @@ function createDb() {
     support: seedSupport() as SupportState,
     ai: seedAi() as AiState,
     integrations: seedIntegrations() as IntegrationsState,
+    legacy: seedLegacy() as LegacyState,
   };
 }
 
