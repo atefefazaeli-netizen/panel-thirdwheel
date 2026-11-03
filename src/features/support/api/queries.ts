@@ -16,13 +16,13 @@ export const useTickets = (q: TicketQuery) =>
 export const useTicket = (id: string | null) =>
   useQuery({ queryKey: supportKeys.ticket(id ?? ''), queryFn: () => supportApi.find(id!), enabled: !!id });
 
-const toDataUrl = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(r.error ?? new Error('Could not read the image'));
-    r.readAsDataURL(blob);
-  });
+/** Blob → data URL without FileReader (works with any Blob implementation, tests included). */
+export async function toDataUrl(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:${blob.type || 'application/octet-stream'};base64,${btoa(bin)}`;
+}
 
 /**
  * The screenshot as a data URL. It is fetched with the bearer token (an <img src> pointing at the
