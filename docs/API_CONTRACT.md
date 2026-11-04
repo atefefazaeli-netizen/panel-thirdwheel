@@ -1,4 +1,4 @@
-> **Copy for reference.** The source of truth is `backend/docs/ADMIN_API.md` in the app repo (`atefefazaeli-netizen/app`). When they differ, the backend file wins; update this copy from it. Copied on 2026-11-03. Notes on how the panel reads the open points are in [ARCHITECTURE.md](ARCHITECTURE.md#10-contract-notes).
+> **Copy for reference.** The source of truth is `backend/docs/ADMIN_API.md` in the app repo (`atefefazaeli-netizen/app`). When they differ, the backend file wins; update this copy from it. Copied on 2026-11-04 (accounts audit). Notes on how the panel reads the open points are in [ARCHITECTURE.md](ARCHITECTURE.md#10-contract-notes).
 
 # Thirdwheel Admin API · shared contract (v1)
 
@@ -9,7 +9,8 @@ Lists use the existing pagination: query `page` (1-based), `limit` (≤100); res
 
 ## Roles
 - `admin` (ADMIN_EMAILS) and `clinician` (CLINICIAN_EMAILS). An account can hold both.
-- Roles are re-synced from env at every sign-in (email OTP verify and social sign-in), so env changes apply on the next sign-in. Access tokens already carry roles through `JwtStrategy` (it reads the account).
+- Roles come from the env lists as they are now, on every authenticated request (`JwtStrategy`), every refresh and every sign-in: removing an email from `ADMIN_EMAILS` or `CLINICIAN_EMAILS` (and restarting) takes the staff role away at the next request with the token the person already holds, and adding one grants it the same way. The stored `roles` field is only a cache and never grants staff access. `AdminAccountRow.roles` and the `STAFF_ACCOUNT` check read the current roles.
+- A role refusal is 403 with `code: 'INSUFFICIENT_ROLE'` (a suspended account is 403 `ACCOUNT_SUSPENDED`).
 - Panel access = admin or clinician. `GET users/me` style check: panel calls `GET admin/me` → `{ userId, email, roles }` (any staff role, 403 otherwise).
 - Clinician-only: approve content, request changes. Admin-only: everything that changes accounts, AI settings, integrations, content drafts. Both: read content, review queue, safety log (read, review, notes, escalate), dashboard, audit log (admin only).
 
@@ -28,7 +29,8 @@ Every admin/clinician/n8n write publishes `audit.recorded` (contract in `admin.c
 - `GET admin/users?q=&plan=free|plus|paid_by_partner|cancelled|payment_problem&linked=true|false&suspended=true|false&tag=&from=&to=&page=&limit=` (admin)
   - `q` matches email (contains) OR name (users module). from/to = registration date (ISO date).
   - Row: `{ userId, email, name, createdAt, plan, plus, linked, partner: { userId, name } | null, suspended, tags }`
-- `GET admin/users/:id` (admin) → `{ account: AdminAccountRow, profile: AdminProfileView | null, couple: { coupleId, linkedAt, partner: { userId, name, email } } | null, subscription: AdminSubscriptionView | null, safety: { open, total, lastAt }, support: { total, open } }`
+- `GET admin/users/:id` (admin) → `{ account: AdminAccountRow, profile: AdminProfileView | null, couple: { coupleId, linkedAt, partner: { userId, name, email } } | null, subscription: AdminSubscriptionView | null, safety: { open, total, lastAt }, support: { total, open }, unavailable: ('profile'|'couple'|'subscription'|'safety'|'support')[] }` (`unavailable` names the parts that are null because their owner failed, not because there is nothing)
+- AdminSubscriptionView: `{ userId, state, plus, renewsAt, grant: { until, by, note } | null, experiencesUsed, source: 'store'|'admin_grant'|'partner'|'none', verification: 'mock'|'store'|null }`. `source` says where the current Plus comes from (same precedence as the app's state); `verification` says how the store purchase behind it (own or the partner's) was checked: `mock` while the server runs the development receipt verifier (`mock:<product>:<transaction>`, no App Store or Play check), `store` with a real adapter, null when no store purchase is involved. Show `mock` as unverified. No revenue or billing figures.
 - `POST admin/users/:id/sign-out` (admin) → `{ ok: true }` (revokes refresh tokens, bumps token version)
 - `POST admin/users/:id/suspend` `{ reason (1..300) }` → AdminAccountRow. Also signs out.
 - `POST admin/users/:id/unsuspend` → AdminAccountRow
@@ -46,7 +48,7 @@ Server side: `chat.risk_detected` → flag with surface `third-ear-server`; `cha
 Folding: same user + kind with an open flag whose lastAt is within 10 min → `count++`, `lastAt` updated, no new event.
 Levels: crisis high, safety medium, heat low. Retention: deleted 180 days after lastAt (TTL), and on account deletion. Included in the person's data export (kind, level, surface, dates, status; staff notes included).
 Panel (admin or clinician):
-- `GET admin/safety/flags?status=open|reviewed|escalated&level=&kind=&userId=&from=&to=&page=&limit=` → page of SafetyFlag
+- `GET admin/safety/flags?status=open|reviewed|escalated&level=&kind=&surface=third-ear|third-ear-server|quiz|answer|other&userId=&from=&to=&page=&limit=` → page of SafetyFlag (every filter runs on the server; an unknown surface is 400)
 - `GET admin/safety/flags/:id` → SafetyFlag
 - `POST admin/safety/flags/:id/review` `{ note?: ≤2000 }` → SafetyFlag (status reviewed)
 - `POST admin/safety/flags/:id/notes` `{ text: 1..2000 }` → SafetyFlag
@@ -140,8 +142,9 @@ Incoming action (public route, API key):
   - Response 200 `{ ok: true, action, result }` (`result` = the owner's answer). 401 `API_KEY_INVALID`, 403 `API_KEY_SCOPE`, 400 `UNKNOWN_ACTION`, 400 `INVALID_ACTION_DATA` (with `details`), 503 `ACTION_UNAVAILABLE` (the owning module does not answer); the owner's own errors pass through. Throttle 60/min per key. Audit actor `apikey:<name>`, action `n8n.<action>`.
 Bus: the integrations module answers `integrations.admin.stats` → `{ webhooks (enabled), failed24h }`.
 
-## Support (existing, unchanged routes)
-`GET support/tickets?status=&page=&limit=`, `PUT support/tickets/:id/status`, `GET support/tickets/:id/screenshot` (admin). New: the support module publishes `support.ticket_created` after a ticket is saved.
+## Support (admin)
+`GET support/tickets?status=&page=&limit=`, `GET support/tickets/:id` (one ticket, for deep links; 404 `TICKET_NOT_FOUND`), `PUT support/tickets/:id/status` `{ status: open|closed }` (404 `TICKET_NOT_FOUND`; audit `support.ticket_status`, target `support_ticket:<id>`, meta `{ userId, status }`), `GET support/tickets/:id/screenshot` (404 `TICKET_NOT_FOUND` or `SCREENSHOT_NOT_FOUND`). Ticket: `{ id, ref, userId, kind: message|problem, topic, text, device, hasScreenshot, status, createdAt }`. The support module publishes `support.ticket_created` after a ticket is saved.
+Not built and not in the requirements (open product decisions): replies to the person from the panel, internal notes, assignment, priority. The app tells the person "Support will reply by email" (Help & legal › Contact support), and each ticket is emailed to `SUPPORT_INBOX_EMAIL` when set; nothing in PROJECT_CONTEXT §10 or the Figma-derived screens asks for in-panel replies.
 
 ## Legacy catalog and experiences (existing routes, admin)
 `GET/POST catalog/items`, `PATCH/DELETE catalog/items/:id`; `GET/POST experiences`, `PATCH/DELETE experiences/:id`. Read the controllers/DTOs for exact shapes. Venue booking links: `PUT/DELETE ideas/:id/booking-link`.
