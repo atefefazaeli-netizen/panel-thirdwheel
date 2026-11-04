@@ -1,4 +1,4 @@
-import type { SubscriptionState } from '../api/types';
+import type { AdminSubscriptionView, SubscriptionState } from '../api/types';
 
 export const PLAN_LABEL: Record<SubscriptionState, string> = {
   free: 'Free',
@@ -22,3 +22,22 @@ export const LIVING_LABEL: Record<string, string> = {
   same: 'Same city',
   long: 'Long distance',
 };
+
+const SOURCE_BASE: Record<NonNullable<AdminSubscriptionView['source']>, string> = {
+  store: 'Store purchase',
+  admin_grant: 'Admin grant',
+  partner: 'Partner’s plan',
+  none: 'None',
+};
+
+/**
+ * Where Plus comes from, saying plainly when the store purchase behind it was never checked with
+ * Apple or Google (the API's receipt verifier is a mock in this build).
+ */
+export function plusSourceLabel(s: Pick<AdminSubscriptionView, 'source' | 'verification'>): string {
+  if (!s.source) return 'Not reported by this API version';
+  const base = s.source === 'partner' && s.verification ? 'Partner’s store purchase' : SOURCE_BASE[s.source];
+  if (s.verification === 'mock') return `${base} (receipt verification is mocked in this build)`;
+  if (s.verification === 'store') return `${base} (receipt verified by the store)`;
+  return base;
+}

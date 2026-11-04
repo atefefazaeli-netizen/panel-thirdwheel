@@ -113,3 +113,55 @@ describe('users when an owner module fails (null parts)', () => {
     expect(screen.getByText('Not available: the support service did not answer.')).toBeInTheDocument();
   });
 });
+
+describe('Plus source and receipt verification (ADMIN_API.md › AdminSubscriptionView)', () => {
+  it('says a store purchase is unverified while the API mocks receipts, for the buyer and the partner', async () => {
+    renderRoute(`/users/${uid('sara')}`);
+    expect(
+      await screen.findByText('Store purchase (receipt verification is mocked in this build)'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Unverified')).toBeInTheDocument();
+    cleanup();
+    renderRoute(`/users/${uid('alex')}`);
+    expect(
+      await screen.findByText('Partner’s store purchase (receipt verification is mocked in this build)'),
+    ).toBeInTheDocument();
+  });
+
+  it('an admin grant and no Plus carry no verification', async () => {
+    const { plusSourceLabel } = await import('../lib/labels');
+    expect(plusSourceLabel({ source: 'admin_grant', verification: null })).toBe('Admin grant');
+    expect(plusSourceLabel({ source: 'none', verification: null })).toBe('None');
+    expect(plusSourceLabel({ source: 'partner', verification: null })).toBe('Partner’s plan');
+    expect(plusSourceLabel({ source: 'store', verification: 'store' })).toBe(
+      'Store purchase (receipt verified by the store)',
+    );
+    expect(plusSourceLabel({})).toBe('Not reported by this API version');
+  });
+});
+
+describe('unavailable parts are told apart from empty ones', () => {
+  it('a failed profile or partners owner reads Not available, not No profile / Not linked', async () => {
+    const { http, HttpResponse } = await import('msw');
+    const { server } = await import('@/mocks/node');
+    const { p } = await import('@/mocks/utils');
+    server.use(
+      http.get(p('admin/users/:id'), () =>
+        HttpResponse.json({
+          account: db().users.get(uid('sara'))!.account,
+          profile: null,
+          couple: null,
+          subscription: null,
+          safety: { open: 0, total: 0, lastAt: null },
+          support: { total: 0, open: 0 },
+          unavailable: ['profile', 'couple', 'subscription'],
+        }),
+      ),
+    );
+    renderRoute(`/users/${uid('sara')}`);
+    expect(await screen.findByText('The profile service did not answer. Try again later.')).toBeInTheDocument();
+    expect(screen.getByText('Not available: the partners service did not answer.')).toBeInTheDocument();
+    expect(screen.queryByText('No profile yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not linked with a partner.')).not.toBeInTheDocument();
+  });
+});
