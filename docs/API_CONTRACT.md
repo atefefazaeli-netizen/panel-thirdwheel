@@ -3,7 +3,7 @@
 # Thirdwheel Admin API · shared contract (v1)
 
 Source of truth for the backend builders and the panel builder. All routes sit under `/api/v1`.
-Errors use the existing shape `{ statusCode, message, code?, requestId, retryAt? }`.
+Errors use the existing shape `{ statusCode, message, code?, requestId, retryAt? }`. Every 429 has `code: 'RATE_LIMITED'`, `retryAt` and a `Retry-After` header (seconds), exposed to the panel by CORS.
 Lists use the existing pagination: query `page` (1-based), `limit` (≤100); response
 `{ items, meta: { page, limit, total, totalPages } }` (`Paginated` / `paginate` in `libs/common/src`).
 
@@ -19,7 +19,7 @@ Same endpoints as the app: `POST auth/email/start` → `POST auth/email/verify` 
 
 ## Audit
 Every admin/clinician/n8n write publishes `audit.recorded` (contract in `admin.contracts.ts`). The admin module stores it.
-- `GET admin/audit?actor=&action=&target=&page=&limit=` (admin) → page of `{ id, actor, actorEmail, action, target, meta, at }`.
+- `GET admin/audit?actor=&action=&target=&page=&limit=` (admin) → page of `{ id, actor, actorEmail, action, target, meta, at }`. `actor` matches exactly; `action` and `target` match exactly or as a prefix (`content.`, `user:<id>`, `webhook:`).
 
 ## Dashboard
 - `GET admin/me` (staff) → `{ userId, email, roles }`
@@ -118,9 +118,9 @@ Seed: migration `20261104-01-seed-content` loads the bundled Release 1 content (
 
 ## AI engine (admin; clinician read-only)
 - `GET admin/ai/settings` → `{ current: AiRuntimeSettings, defaults: { provider, anthropic, openai, prompts: { modes: Record<mode,string>, quizStyle: string }, supports: { temperature: { anthropic: false, openai: true } } }, keys: { anthropic: boolean, openai: boolean }, modes: string[], locked: { chatRules: string, chatOutput: string, quizRules: string } }`. Before any save `current` is the environment's settings with `version: 0`. `supports` says which client takes a temperature (the Anthropic client takes none; effort is its control).
-- `PUT admin/ai/settings` (admin) `{ provider, anthropic, openai, fallbackOnly, prompts, note? }` → AiRuntimeSettings (version+1). 400 `PROVIDER_NOT_CONFIGURED` when the chosen provider (anthropic or openai) has no API key. Prompt text ≤ 1500 chars each; null or blank = default. `prompts.modes` keys must be in `modes` (else 400 `INVALID_AI_SETTINGS`); missing keys are stored as null. `openai.temperature` 0..2 or null. `anthropic.effort` low|medium|high|xhigh|max. `note` ≤ 300. Two saves at the same moment: 409 `SETTINGS_CONFLICT`.
+- `PUT admin/ai/settings` (admin) `{ provider, anthropic, openai, fallbackOnly, prompts, note? }` → AiRuntimeSettings (version+1). 400 `PROVIDER_NOT_CONFIGURED` when the chosen provider (anthropic or openai) has no API key. Prompt text ≤ 1500 chars each; null or blank = default. `prompts.modes` keys must be in `modes` (else 400 `INVALID_AI_SETTINGS`); missing keys are stored as null. `openai.temperature` 0..2 or null. `anthropic.effort` low|medium|high|xhigh|max. `note` ≤ 300. Optional `baseVersion` (integer ≥ 0): the version the change was made on (`current.version` when the page loaded); when another save landed since, 409 `SETTINGS_CONFLICT` and nothing is saved. Without it the save goes over whatever is current, and two saves at the same moment still answer 409 `SETTINGS_CONFLICT`.
 - `GET admin/ai/settings/history?page=&limit=` → page of `{ version, updatedAt, updatedBy, updatedByEmail, note, settings }` (newest first; `settings` is the full AiRuntimeSettings of that version)
-- `POST admin/ai/settings/rollback` (admin) `{ version }` → AiRuntimeSettings (as a new version, note "Rollback to version N"). 404 `VERSION_NOT_FOUND`; 400 `PROVIDER_NOT_CONFIGURED` if that version's provider has lost its key.
+- `POST admin/ai/settings/rollback` (admin) `{ version, baseVersion? }` (409 `SETTINGS_CONFLICT` as for PUT) → AiRuntimeSettings (as a new version, note "Rollback to version N"). 404 `VERSION_NOT_FOUND`; 400 `PROVIDER_NOT_CONFIGURED` if that version's provider has lost its key.
 - `POST admin/ai/test` (admin) `{ mode, text ≤ 1000, draft?: settings }` → 200 `{ source: 'ai'|'fallback'|'risk', reply, latencyMs, provider, model }`. `mode` is a Third Ear mode or `quiz` (the quiz result writer). Runs `detectRisk` first (and on the model's reply); nothing is stored. `draft` is validated like PUT. AI off (fallbackOnly, provider none) or a failed or malformed reply → `source: 'fallback'` with an explanation in `reply`. Throttle 10/min.
 - Editable: the task line per Third Ear mode and the quiz result style. Locked (returned read-only in `locked`): who Third Ear is, the safety rules, the JSON output contracts, the quiz privacy rules. The AI quiz and game question prompt is not editable.
 - Every save and rollback publishes `ai-engine.settings_changed` and `audit.recorded` (actions `ai.settings.update`, `ai.settings.rollback`, target `ai-settings:<version>`).
@@ -154,11 +154,11 @@ API keys (incoming):
 - `DELETE admin/integrations/api-keys/:id` → revokes (204; revoking again is a no-op). 404 `API_KEY_NOT_FOUND`.
 Incoming action (public route, API key):
 - `POST integrations/n8n/action` headers `X-Api-Key: twk_…`, optional `Idempotency-Key` (8..80 of `A-Za-z0-9_-`; the shared idempotency mechanism, per API key: a retry within 24 h gets the first answer with `Idempotent-Replay: true`, a duplicate while the first runs gets 409 `REQUEST_IN_PROGRESS`). Body `{ action, data }`:
-  - `user.suspend` `{ userId, reason (1..300) }` (scope users.flag) → `auth.admin.suspend`
+  - `user.suspend` `{ userId, reason (1..300) }` (scope users.flag) → `auth.admin.suspend`. Never a staff account (admin or clinician): 409 `STAFF_ACCOUNT`, so an automation can't lock the team out of the panel.
   - `user.unsuspend` `{ userId }` (users.flag) → `auth.admin.unsuspend`
   - `user.tag` `{ userId, add?: string[], remove?: string[] }` (users.flag; each tag 1..32 of `[a-z0-9-]`, ≤ 20 per list, at least one tag in all) → `auth.admin.tags`
   - `content.import` `{ items: ContentImportItem[] 1..200, note? ≤ 500 }` (content.import) → `content.import` → drafts in review only
-  - Response 200 `{ ok: true, action, result }` (`result` = the owner's answer). 401 `API_KEY_INVALID`, 403 `API_KEY_SCOPE`, 400 `UNKNOWN_ACTION`, 400 `INVALID_ACTION_DATA` (with `details`), 503 `ACTION_UNAVAILABLE` (the owning module does not answer); the owner's own errors pass through. Throttle 60/min per key. Audit actor `apikey:<name>`, action `n8n.<action>`.
+  - Response 200 `{ ok: true, action, result }` (`result` = the owner's answer). 401 `API_KEY_INVALID`, 403 `API_KEY_SCOPE`, 400 `UNKNOWN_ACTION`, 400 `INVALID_ACTION_DATA` (with `details`), 400 `IDEMPOTENCY_KEY_INVALID` (an `Idempotency-Key` that is not 8..80 of `A-Za-z0-9_-`; nothing runs), 503 `ACTION_UNAVAILABLE` (the owning module does not answer); the owner's own errors pass through. Throttle 60/min per key; 20 failed key checks a minute from one address get 429 `RATE_LIMITED` (also for a valid key from that address until the minute ends). Audit actor `apikey:<name>`, action `n8n.<action>`.
 Bus: the integrations module answers `integrations.admin.stats` → `{ webhooks (enabled), failed24h }`.
 
 ## Support (admin)
@@ -167,6 +167,10 @@ Not built and not in the requirements (open product decisions): replies to the p
 
 ## Legacy catalog and experiences (existing routes, admin)
 `GET/POST catalog/items`, `PATCH/DELETE catalog/items/:id`; `GET/POST experiences`, `PATCH/DELETE experiences/:id`. Read the controllers/DTOs for exact shapes. Venue booking links: `PUT/DELETE ideas/:id/booking-link`.
+- `GET catalog/admin/items?where=&kind=&maxUsd=&page=&limit=` (admin) → page of the ideas with `tags` and `refPrefix` (the public `GET catalog/items` strips both), read fresh.
+- `POST catalog/items`: `id` is optional; without it the server takes the next free id after every id ever used (retired ideas keep theirs). 409 `CATALOG_ITEM_EXISTS`. `PATCH` and `DELETE`: 404 `CATALOG_ITEM_NOT_FOUND`. A `null` optional field in a PATCH clears it (the panel sends null for fields the admin emptied). `per` (the price suffix the app appends to the price) is stored with exactly one leading space, whatever was sent; migration `20261104-30` repairs suffixes an earlier save had trimmed.
+- Experiences: 409 `EXPERIENCE_EXISTS`, 404 `EXPERIENCE_NOT_FOUND`; null clears an optional field as above. `DELETE ideas/:id/booking-link`: 404 `BOOKING_LINK_NOT_FOUND`.
+- Every write is audited: `catalog.item.create|update|retire` (`catalog_item:<id>`, update meta `fields`), `experience.create|update|retire` (`experience:<id>`), `booking_link.set|remove` (`booking_link:<card id>`, set meta `{ host, paid, venue }`, never the full URL).
 
 ## CORS
 Add the panel origin (`PANEL_URL`) to `CORS_ORIGINS` in deployment docs. The panel's dev server proxies `/api` to the API instead.
