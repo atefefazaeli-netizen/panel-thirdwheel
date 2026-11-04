@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legacyApi } from './legacy-api';
-import type { CatalogItem, CatalogQuery, Experience, ExperienceQuery } from './types';
+import type { CatalogItemInput, CatalogQuery, Experience, ExperienceQuery } from './types';
 
 export const legacyKeys = {
   all: ['legacy'] as const,
@@ -46,14 +46,16 @@ const withNulls = <T extends object>(v: T, keys: readonly string[]) => ({
 });
 
 export const useSaveCatalogItem = () =>
-  useWrite((v: { item: CatalogItem; isNew: boolean; sendTags?: boolean; sendRefPrefix?: boolean }) => {
-    if (v.isNew) return legacyApi.createItem(v.item);
-    // The public list hides tags and refPrefix, so an edit only sends them when they were changed.
-    const { id, tags, refPrefix, ...rest } = v.item;
-    const patch: Partial<CatalogItem> = { ...(withNulls(rest, ITEM_OPTIONAL) as Partial<CatalogItem>) };
+  useWrite((v: { item: CatalogItemInput; id?: number; sendTags?: boolean; sendRefPrefix?: boolean }) => {
+    if (v.id === undefined) return legacyApi.createItem(v.item);
+    // Tags and refPrefix are only sent when changed, so an edit never rewrites them by accident.
+    const { id: _id, tags, refPrefix, ...rest } = v.item;
+    const patch: Partial<Omit<CatalogItemInput, 'id'>> = {
+      ...(withNulls(rest, ITEM_OPTIONAL) as Partial<CatalogItemInput>),
+    };
     if (v.sendTags) patch.tags = tags ?? [];
     if (v.sendRefPrefix && refPrefix) patch.refPrefix = refPrefix;
-    return legacyApi.updateItem(id, patch);
+    return legacyApi.updateItem(v.id, patch);
   });
 export const useDeleteCatalogItem = () => useWrite((id: number) => legacyApi.deleteItem(id));
 export const useSaveExperience = () =>

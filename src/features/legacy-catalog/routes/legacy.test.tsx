@@ -22,6 +22,27 @@ describe('legacy catalog (mock API)', () => {
     expect(db().legacy.items.find((i) => i.id === 1)!.tags).toEqual(['active', 'competitive', 'out', 'evening']);
   });
 
+  it('shows the hidden ranking tags from the admin list and adds an idea with the next free id', async () => {
+    const user = userEvent.setup();
+    db().legacy.retired.add(Math.max(...db().legacy.items.map((i) => i.id)));
+    const top = Math.max(...db().legacy.items.map((i) => i.id));
+    renderRoute('/catalog', { roles: ['admin'] });
+    await user.click(await screen.findByText('Beginner padel for two'));
+    const editDrawer = await screen.findByRole('dialog');
+    expect(within(editDrawer).getByText('competitive')).toBeInTheDocument();
+    await user.click(within(editDrawer).getByRole('button', { name: 'Cancel' }));
+
+    await user.click(await screen.findByRole('button', { name: /New idea/ }));
+    const drawer = await screen.findByRole('dialog');
+    expect(within(drawer).getByRole('spinbutton', { name: 'Id' })).toHaveValue(null);
+    await user.type(within(drawer).getByRole('textbox', { name: 'Title' }), 'Night swim');
+    await user.type(within(drawer).getByRole('textbox', { name: /Why it fits/ }), 'Warm night.');
+    await user.type(within(drawer).getByRole('textbox', { name: /Meta/ }), '1 hour');
+    await user.click(within(drawer).getByRole('button', { name: 'Add idea' }));
+    // After every id ever used, the retired one included: no collision with a hidden id.
+    await waitFor(() => expect(db().legacy.items.find((i) => i.title === 'Night swim')?.id).toBe(top + 1));
+  });
+
   it('adds and retires an experience', async () => {
     const user = userEvent.setup();
     renderRoute('/experiences', { roles: ['admin'] });

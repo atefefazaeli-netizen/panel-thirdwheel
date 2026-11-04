@@ -8,11 +8,18 @@ import { formToItem, formToXp, itemToForm, xpToForm } from './codec';
 describe('legacy codecs', () => {
   it('round-trips every seeded date idea through the form', () => {
     for (const i of items as CatalogItem[]) {
-      const form = itemToForm(i, 0);
+      const form = itemToForm(i);
       expect(catalogItemSchema.safeParse(form).success, String(i.id)).toBe(true);
       const { src: _s, srcName: _n, link: _l, area: _a, ...editable } = i;
       expect(formToItem(form)).toEqual(editable);
     }
+  });
+
+  it('a new idea leaves the id out so the server picks the next free one; the body never carries read-only fields', () => {
+    const body = formToItem({ ...itemToForm(null), title: 'Night swim', reason: 'Warm night.', meta: '1 hour' });
+    expect(body).not.toHaveProperty('id');
+    for (const k of ['src', 'srcName', 'link', 'area']) expect(body).not.toHaveProperty(k);
+    expect(formToItem({ ...itemToForm(null), id: 120, title: 't', reason: 'r', meta: 'm' }).id).toBe(120);
   });
 
   it('round-trips every seeded experience through the form', () => {
@@ -25,8 +32,7 @@ describe('legacy codecs', () => {
 
   it('rejects icon paths that are not SVG path data and bad weights', () => {
     expect(
-      catalogItemSchema.safeParse({ ...itemToForm(null, 99), title: 'x', reason: 'r', meta: 'm', d: '<script>' })
-        .success,
+      catalogItemSchema.safeParse({ ...itemToForm(null), title: 'x', reason: 'r', meta: 'm', d: '<script>' }).success,
     ).toBe(false);
     const f = { ...xpToForm(null), id: 'x-test', title: 't', meta: 'm', reason: 'r', pText: '{"talk":"lots"}' };
     expect(experienceSchema.safeParse(f).success).toBe(false);

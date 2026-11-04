@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isApiError } from '@/lib/api';
 import { aiApi } from './ai-api';
 import type { AiSettingsInput } from './types';
 
@@ -17,6 +18,11 @@ function useAiWrite<V>(fn: (v: V) => Promise<unknown>) {
   return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries({ queryKey: aiKeys.all }) });
 }
 
-export const useSaveAiSettings = () => useAiWrite((v: AiSettingsInput & { note?: string }) => aiApi.save(v));
-export const useRollbackAiSettings = () => useAiWrite((version: number) => aiApi.rollback(version));
+/** True for the 409 the server sends when someone else saved since this page loaded. */
+export const isSettingsConflict = (e: unknown) => isApiError(e) && e.code === 'SETTINGS_CONFLICT';
+
+export const useSaveAiSettings = () =>
+  useAiWrite((v: AiSettingsInput & { note?: string; baseVersion: number }) => aiApi.save(v));
+export const useRollbackAiSettings = () =>
+  useAiWrite((v: { version: number; baseVersion: number }) => aiApi.rollback(v.version, v.baseVersion));
 export const useAiTest = () => useMutation({ mutationFn: aiApi.test, meta: { silent: true } });

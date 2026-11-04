@@ -3,6 +3,7 @@ export * from './data-table';
 export * from './form-fields';
 export { ConfirmDialog, type ConfirmDialogProps } from './confirm-dialog';
 export { CopyButton, type CopyButtonProps } from './copy-button';
+export { DemoBanner } from './demo-banner';
 export { DangerConfirmDialog, type DangerConfirmDialogProps } from './danger-confirm-dialog';
 export { DrawerPreview, type DrawerPreviewProps } from './drawer-preview';
 export { EmptyState, type EmptyStateProps } from './empty-state';

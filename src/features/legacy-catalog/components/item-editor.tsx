@@ -24,28 +24,26 @@ export function ItemEditor({
   open,
   onOpenChange,
   item,
-  nextId,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   item: CatalogItem | null;
-  nextId: number;
 }) {
   const save = useSaveCatalogItem();
   const form = useForm<CatalogItemForm>({
     resolver: zodResolver(catalogItemSchema),
-    defaultValues: itemToForm(item, nextId),
+    defaultValues: itemToForm(item),
   });
   React.useEffect(() => {
-    if (open) form.reset(itemToForm(item, nextId));
-  }, [open, item, nextId, form]);
+    if (open) form.reset(itemToForm(item));
+  }, [open, item, form]);
   const v = useWatch({ control: form.control });
 
   const submit = form.handleSubmit(async (values) => {
     try {
       await save.mutateAsync({
         item: formToItem(values),
-        isNew: !item,
+        id: item?.id,
         sendTags: !!form.formState.dirtyFields.tags,
         sendRefPrefix: !!form.formState.dirtyFields.refPrefix,
       });
@@ -93,7 +91,7 @@ export function ItemEditor({
             label="Id"
             min={1}
             disabled={!!item}
-            description="A number; never changes."
+            description={item ? 'Never changes.' : 'Leave empty for the next free id. Never changes.'}
           />
           <FormFieldSelect
             control={form.control}

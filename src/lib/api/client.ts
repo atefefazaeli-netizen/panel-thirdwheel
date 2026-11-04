@@ -76,6 +76,8 @@ interface RawResult {
   status: number;
   body: unknown;
   requestId: string | null;
+  /** `Retry-After` (seconds) on a 429; readable cross-origin because the API exposes it. */
+  retryAfter?: number | null;
 }
 
 async function send(
@@ -130,7 +132,13 @@ async function send(
         parsed = { message: text.slice(0, 200) };
       }
     }
-    return { status: res.status, body: parsed, requestId: echoed };
+    const ra = res.headers.get('retry-after');
+    return {
+      status: res.status,
+      body: parsed,
+      requestId: echoed,
+      retryAfter: ra != null && ra !== '' ? Number(ra) : null,
+    };
   } finally {
     clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onAbort);
@@ -139,7 +147,12 @@ async function send(
 
 function httpError(r: RawResult): ApiError {
   const body = r.body && typeof r.body === 'object' ? (r.body as ApiErrorBody) : null;
-  return new ApiError('http', { status: r.status, body, requestId: r.requestId });
+  return new ApiError('http', {
+    status: r.status,
+    body,
+    requestId: r.requestId,
+    retryAfterSeconds: r.retryAfter ?? null,
+  });
 }
 
 /* ---------- Refresh (single flight) ---------- */

@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PlayIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -8,9 +9,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form } from '@/components/ui/form';
 import { errorMessage } from '@/lib/api';
 import { useAiTest } from '../api/queries';
-import type { AiSettingsInput } from '../api/types';
+import type { AiSettingsInput, AiTestResult } from '../api/types';
 import { testSchema, TEST_TEXT_MAX } from '../schemas/ai';
 import { MODE_LABEL } from '../lib/labels';
+
+/** What each answer source means, so nobody mistakes built-in copy for a model reply. */
+const SOURCE_COPY: Record<AiTestResult['source'], { label: string; help: string }> = {
+  ai: { label: 'Real model reply', help: 'The model answered and the reply passed the safety check.' },
+  fallback: {
+    label: 'Fallback copy, not the model',
+    help: 'No model reply was used: AI is off for these settings (fallback only, provider none or no API key), or the model failed or answered in the wrong shape. The app would show this built-in copy.',
+  },
+  risk: {
+    label: 'Safety reply (risk check)',
+    help: 'The crisis check matched your message or the model reply, so the app shows its safety copy and never the model.',
+  },
+};
 
 /** Try a message against the current settings, or the unsaved ones. Nothing is stored. */
 export function TestConsole({
@@ -27,8 +41,12 @@ export function TestConsole({
     resolver: zodResolver(testSchema),
     defaultValues: { mode: modes[0] ?? 'vent', text: '', useDraft: false },
   });
+  const [draftError, setDraftError] = React.useState(false);
   const submit = form.handleSubmit(async ({ mode, text, useDraft }) => {
     const draft = useDraft ? getDraft() : null;
+    // Never fall back to the saved settings silently when the unsaved ones were asked for.
+    setDraftError(useDraft && !draft);
+    if (useDraft && !draft) return;
     await test.mutateAsync({ mode, text, ...(draft ? { draft } : {}) }).catch(() => undefined);
   });
   const r = test.data;
@@ -67,6 +85,13 @@ export function TestConsole({
             </Button>
           </form>
         </Form>
+        {draftError && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>
+              The unsaved settings have errors. Fix them on the page, or turn off Use unsaved changes.
+            </AlertDescription>
+          </Alert>
+        )}
         {test.error && (
           <Alert variant="destructive" className="mt-4">
             <AlertDescription>{errorMessage(test.error)}</AlertDescription>
@@ -75,12 +100,13 @@ export function TestConsole({
         {r && (
           <div className="mt-4 flex flex-col gap-2 rounded-lg border p-3" aria-live="polite">
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <StatusBadge status={r.source} />
+              <StatusBadge status={r.source} label={SOURCE_COPY[r.source]?.label} />
               <span className="text-muted-foreground">
                 {r.provider}
                 {r.model ? ` · ${r.model}` : ''} · {r.latencyMs} ms
               </span>
             </div>
+            {SOURCE_COPY[r.source] && <p className="text-xs text-muted-foreground">{SOURCE_COPY[r.source].help}</p>}
             <p className="text-sm whitespace-pre-wrap">{r.reply}</p>
           </div>
         )}

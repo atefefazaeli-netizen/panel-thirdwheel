@@ -40,16 +40,19 @@ export function AppShell({ user, badges, onSignOut, banner, children }: AppShell
       </a>
       <AppSidebar user={user} badges={badges} />
       <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
-          <Breadcrumbs />
-          <div className="ml-auto flex items-center gap-1">
-            <ThemeToggle />
-            {user && <UserMenu user={user} onSignOut={onSignOut} />}
-          </div>
-        </header>
-        {banner}
+        {/* The banner (demo data) sticks with the top bar, so it stays in view on every page. */}
+        <div className="sticky top-0 z-20">
+          {banner}
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+            <Breadcrumbs />
+            <div className="ml-auto flex items-center gap-1">
+              <ThemeToggle />
+              {user && <UserMenu user={user} onSignOut={onSignOut} />}
+            </div>
+          </header>
+        </div>
         <div
           id="main"
           tabIndex={-1}

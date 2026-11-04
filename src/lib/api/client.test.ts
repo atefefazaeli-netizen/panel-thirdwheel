@@ -50,6 +50,28 @@ describe('error mapping', () => {
     expect(errorMessage(e)).toBe('An item with this id already exists.');
   });
 
+  it('429: says how long to wait, from retryAt or else from the Retry-After header', async () => {
+    const soon = new Date(Date.now() + 42_000).toISOString();
+    server.use(
+      http.get(p('limited-body'), () =>
+        HttpResponse.json({ statusCode: 429, message: 'x', code: 'RATE_LIMITED', retryAt: soon }, { status: 429 }),
+      ),
+      http.get(p('limited-header'), () =>
+        HttpResponse.json(
+          { statusCode: 429, message: 'ThrottlerException: Too Many Requests' },
+          { status: 429, headers: { 'Retry-After': '30' } },
+        ),
+      ),
+      http.get(p('limited-bare'), () => HttpResponse.json({ statusCode: 429, message: 'x' }, { status: 429 })),
+    );
+    const a = (await api.get('limited-body', { auth: false }).catch((e: unknown) => e)) as ApiError;
+    expect(errorMessage(a)).toMatch(/^Too many requests\. Try again in 4[12] s\.$/);
+    const b = (await api.get('limited-header', { auth: false }).catch((e: unknown) => e)) as ApiError;
+    expect(errorMessage(b)).toMatch(/^Too many requests\. Try again in (29|30) s\.$/);
+    const c = (await api.get('limited-bare', { auth: false }).catch((e: unknown) => e)) as ApiError;
+    expect(errorMessage(c)).toBe('Too many requests. Wait a moment and try again.');
+  });
+
   it('joins validation message arrays', async () => {
     server.use(
       http.get(p('bad'), () =>
