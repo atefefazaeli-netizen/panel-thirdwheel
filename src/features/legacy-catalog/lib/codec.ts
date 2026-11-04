@@ -1,11 +1,12 @@
-import type { CatalogItem, Experience } from '../api/types';
+import type { CatalogItem, CatalogItemInput, Experience } from '../api/types';
 import type { CatalogItemForm, ExperienceForm } from '../schemas/legacy';
 
 const opt = <T>(v: T | '' | null | undefined) => (v === '' || v === null || v === undefined ? undefined : v);
 
-export function itemToForm(i: CatalogItem | null, nextId: number): CatalogItemForm {
+export function itemToForm(i: CatalogItem | null): CatalogItemForm {
   return {
-    id: i?.id ?? nextId,
+    // Empty for a new idea: the server takes the next free id (retired ideas keep theirs).
+    id: i?.id ?? null,
     title: i?.title ?? '',
     where: i?.where ?? 'out',
     usd: i?.usd ?? 0,
@@ -27,9 +28,9 @@ export function itemToForm(i: CatalogItem | null, nextId: number): CatalogItemFo
 }
 
 /** The request body: empty optional fields are left out, as the DTO expects. */
-export function formToItem(f: CatalogItemForm): CatalogItem {
-  const out: CatalogItem = {
-    id: f.id,
+export function formToItem(f: CatalogItemForm): CatalogItemInput {
+  const out: CatalogItemInput = {
+    ...(f.id != null ? { id: f.id } : {}),
     title: f.title.trim(),
     where: f.where,
     usd: f.usd,
@@ -38,7 +39,7 @@ export function formToItem(f: CatalogItemForm): CatalogItem {
     kind: f.kind,
     d: f.d.trim(),
   };
-  const extra: Partial<CatalogItem> = {
+  const extra: Partial<CatalogItemInput> = {
     // Not trimmed: the app renders `${usd}${per}` (" groceries, estimated").
     per: opt(f.per),
     provider: opt(f.provider.trim()),

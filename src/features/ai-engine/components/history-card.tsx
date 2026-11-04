@@ -117,7 +117,8 @@ export function HistoryCard({ currentVersion }: { currentVersion: number }) {
         confirmLabel="Roll back"
         cancelLabel="Keep current"
         onConfirm={async () => {
-          await rollback.mutateAsync(target!.version);
+          // baseVersion: refused with SETTINGS_CONFLICT when someone saved since this page loaded.
+          await rollback.mutateAsync({ version: target!.version, baseVersion: currentVersion });
           toast.success(`Rolled back to version ${target!.version}`);
         }}
       />

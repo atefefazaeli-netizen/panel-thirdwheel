@@ -73,7 +73,7 @@ const expected = 'v1=' + crypto.createHmac('sha256', SECRET).update(\`\${ts}.\${
 const fresh = Number.isInteger(ts) && Math.abs(Date.now() / 1000 - ts) <= TOLERANCE_SECONDS;
 const valid = fresh && String(headers['x-thirdwheel-signature'] || '')
   .split(/[\\s,]+/)
-  .some((s) => s.length === expected.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected)));
+  .some((s) => Buffer.byteLength(s) === expected.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected)));
 
 let event = {};
 try { event = JSON.parse(raw); } catch (e) { /* not JSON: invalid anyway */ }
@@ -93,7 +93,7 @@ app.post('/thirdwheel', express.raw({ type: 'application/json' }), (req, res) =>
   const fresh = Number.isInteger(ts) && Math.abs(Date.now() / 1000 - ts) <= 300;
   const ok = fresh && (req.get('X-Thirdwheel-Signature') || '')
     .split(/[\\s,]+/)
-    .some((s) => s.length === expected.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected)));
+    .some((s) => Buffer.byteLength(s) === expected.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected)));
   if (!ok) return res.status(401).end();
   const event = JSON.parse(raw); // { id, type, createdAt, data }
   // Dedupe on req.get('X-Thirdwheel-Delivery'): it stays the same across retries.

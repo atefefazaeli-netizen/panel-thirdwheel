@@ -4,7 +4,7 @@
 export type CatalogKind = 'book' | 'guided' | 'home' | 'place';
 export const CATALOG_KINDS: readonly CatalogKind[] = ['book', 'guided', 'home', 'place'];
 
-/** CatalogItemData (public view). Writes return CatalogItemRef (with tags and refPrefix). */
+/** CatalogItemRef: what `catalog/admin/items` and every write answer (the public list strips tags and refPrefix). */
 export interface CatalogItem {
   id: number;
   title: string;
@@ -30,6 +30,13 @@ export interface CatalogItem {
   tags?: string[];
   refPrefix?: string;
 }
+
+/**
+ * What the panel sends (CreateItemDto / UpdateItemDto): the public fields minus the ones the DTO
+ * does not take (src, srcName, link, area belong to imported social links). Without `id` the
+ * server takes the next free one.
+ */
+export type CatalogItemInput = Omit<CatalogItem, 'id' | 'src' | 'srcName' | 'link' | 'area'> & { id?: number };
 
 export interface CatalogQuery {
   where?: 'home' | 'out';

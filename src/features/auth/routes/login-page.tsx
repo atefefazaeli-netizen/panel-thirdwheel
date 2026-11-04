@@ -3,7 +3,7 @@ import { InfoIcon } from 'lucide-react';
 import * as React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ThemeToggle } from '@/components/shared';
+import { DemoBanner, ThemeToggle } from '@/components/shared';
 import { env } from '@/config/env';
 import { useSession } from '@/stores/session';
 import { completeSignIn } from '../api/session';
@@ -36,6 +36,7 @@ export function LoginPage() {
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
+      {env.useMocks && <DemoBanner className="fixed inset-x-0 top-0 z-30" />}
       <div className="absolute top-3 right-3">
         <ThemeToggle />
       </div>
@@ -101,7 +102,7 @@ export function LoginPage() {
       {env.useMocks && (
         <Alert className="max-w-sm">
           <InfoIcon />
-          <AlertTitle>Mock API</AlertTitle>
+          <AlertTitle>Demo sign-in (mock API)</AlertTitle>
           <AlertDescription>
             <p>
               Any email, code <span className="font-mono font-semibold">123456</span>. Use{' '}

@@ -11,6 +11,9 @@ async function enableMocks(): Promise<void> {
   if (!(forced || (!off && import.meta.env.DEV && !import.meta.env.VITE_API_URL))) return;
   const { worker } = await import('@/mocks/browser');
   await worker.start({ onUnhandledFrame: 'bypass', quiet: true });
+  // Loud on purpose: a demo build must never pass for the real panel (the banner says so too).
+  document.title = `[DEMO DATA] ${document.title}`;
+  console.warn('Thirdwheel panel: demo data from the in-browser mock API, not the real API.');
 }
 
 void enableMocks().then(() => {

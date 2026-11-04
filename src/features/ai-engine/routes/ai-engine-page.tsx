@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { InfoIcon, SaveIcon, Undo2Icon } from 'lucide-react';
+import { InfoIcon, RefreshCwIcon, SaveIcon, TriangleAlertIcon, Undo2Icon } from 'lucide-react';
 import * as React from 'react';
 import { useForm, useFormState } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -14,7 +14,7 @@ import { errorMessage } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useRoles } from '@/stores/session';
-import { useAiHistory, useAiSettings, useSaveAiSettings } from '../api/queries';
+import { isSettingsConflict, useAiHistory, useAiSettings, useSaveAiSettings } from '../api/queries';
 import type { AiSettingsView } from '../api/types';
 import { HistoryCard } from '../components/history-card';
 import { PromptsCard } from '../components/prompts-card';
@@ -34,10 +34,10 @@ export function AiEnginePage() {
         <Skeleton className="h-96" />
       </div>
     );
-  return <Settings key={q.data.current.version} view={q.data} />;
+  return <Settings key={q.data.current.version} view={q.data} onReload={() => void q.refetch()} />;
 }
 
-function Settings({ view }: { view: AiSettingsView }) {
+function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => void }) {
   const { isAdmin } = useRoles();
   const readOnly = !isAdmin;
   const schema = React.useMemo(() => aiSettingsSchema(view.keys), [view.keys]);
@@ -51,12 +51,20 @@ function Settings({ view }: { view: AiSettingsView }) {
   const c = view.current;
   const latest = useAiHistory(1).data?.items.find((h) => h.version === c.version);
   const by = latest?.updatedByEmail ?? c.updatedBy;
+  // Someone else saved while this form was open: the server refused ours (409 SETTINGS_CONFLICT).
+  const [conflict, setConflict] = React.useState(false);
 
   const onSave = form.handleSubmit(async (v) => {
     try {
-      const saved = await save.mutateAsync({ ...toInput(v), ...(v.note ? { note: v.note } : {}) });
+      // baseVersion: the version this form was loaded from, so a newer save is never overwritten.
+      const saved = await save.mutateAsync({
+        ...toInput(v),
+        ...(v.note ? { note: v.note } : {}),
+        baseVersion: c.version,
+      });
       toast.success(`Saved as version ${(saved as { version: number }).version}`);
     } catch (e) {
+      if (isSettingsConflict(e)) setConflict(true);
       toast.error(errorMessage(e));
     }
   });
@@ -72,6 +80,22 @@ function Settings({ view }: { view: AiSettingsView }) {
             : `Saved ${formatRelative(c.updatedAt)}${by ? ` by ${by}` : ''}. Changes apply without a redeploy.`
         }
       />
+      {conflict && (
+        <Alert variant="destructive">
+          <TriangleAlertIcon />
+          <AlertTitle>Someone else saved the AI settings</AlertTitle>
+          <AlertDescription>
+            <p>
+              Your changes were not saved, so theirs are not overwritten. They are still in the form: copy anything you
+              want to keep, then reload to see the newest version and make your change again.
+            </p>
+            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onReload}>
+              <RefreshCwIcon />
+              Reload the newest version
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       {readOnly && (
         <Alert>
           <InfoIcon />
