@@ -53,6 +53,9 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      // UI tests render Radix dialogs and tables in jsdom; on a loaded machine a few took over
+      // Vitest's 5 s default. 15 s keeps CI stable without hiding real hangs.
+      testTimeout: 15_000,
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
       css: false,
