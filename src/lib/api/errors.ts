@@ -75,7 +75,22 @@ const CODE_COPY: Record<string, string> = {
   INVALID_CONTENT: 'The content did not pass validation.',
   PROVIDER_NOT_CONFIGURED: 'That provider has no API key on the server.',
   FORBIDDEN: 'Your role cannot do this.',
+  INSUFFICIENT_ROLE: 'Not available for your role.',
+  USER_NOT_FOUND: 'This account no longer exists. It may have been deleted.',
+  INVALID_REASON: 'Give a reason of 1 to 300 characters.',
+  INVALID_TAGS: 'Tags: at most 20, each 1 to 32 characters of a-z, 0-9 and -.',
+  INVALID_DAYS: 'Grant 1 to 365 days.',
+  INVALID_NOTE: 'The note is too long.',
+  TICKET_NOT_FOUND: 'This ticket no longer exists. It may have been deleted with the account.',
+  SCREENSHOT_NOT_FOUND: 'This ticket has no screenshot.',
+  FLAG_NOT_FOUND: 'This safety flag no longer exists. It may have expired or been deleted with the account.',
+  REFRESH_REUSED: 'Your session ended. Sign in again.',
 };
+
+/** 403 for the role (not a suspension): the server says INSUFFICIENT_ROLE. */
+export function isRoleRefusal(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 403 && (e.code === 'INSUFFICIENT_ROLE' || e.code === 'FORBIDDEN');
+}
 
 export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) return (e.code && CODE_COPY[e.code]) || e.message;

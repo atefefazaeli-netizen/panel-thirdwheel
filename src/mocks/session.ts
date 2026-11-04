@@ -24,6 +24,6 @@ export async function guard(
   if (!me) return apiError(401, 'Unauthorized', 'UNAUTHORIZED');
   const isStaff = me.roles.includes('admin') || me.roles.includes('clinician');
   const ok = need === 'user' || (need === 'staff' ? isStaff : me.roles.includes(need));
-  if (!ok) return apiError(403, 'Forbidden resource', 'FORBIDDEN');
+  if (!ok) return apiError(403, 'Insufficient role', 'INSUFFICIENT_ROLE');
   return fn(me);
 }

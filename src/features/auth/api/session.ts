@@ -68,6 +68,36 @@ export async function loadStaff(email?: string): Promise<'signedIn' | 'noAccess'
   }
 }
 
+let rechecking: Promise<'signedIn' | 'noAccess' | 'unchanged'> | null = null;
+let lastRecheck = 0;
+const RECHECK_GAP_MS = 5_000;
+
+/**
+ * The API refused a call for the role (403 INSUFFICIENT_ROLE): the staff member's roles changed
+ * since sign-in (the server reads ADMIN_EMAILS / CLINICIAN_EMAILS on every request). Re-reads
+ * admin/me once (single flight, at most every 5 seconds) so RoleGate and the sidebar follow, or
+ * moves to the no-access screen when no staff role is left.
+ */
+export function recheckRoles(now = Date.now()): Promise<'signedIn' | 'noAccess' | 'unchanged'> {
+  if (rechecking) return rechecking;
+  if (useSession.getState().status !== 'signedIn' || now - lastRecheck < RECHECK_GAP_MS)
+    return Promise.resolve('unchanged');
+  lastRecheck = now;
+  const email = useSession.getState().user?.email;
+  rechecking = loadStaff(email)
+    .catch(() => 'unchanged' as const)
+    .finally(() => {
+      rechecking = null;
+    });
+  return rechecking;
+}
+
+/** For tests. */
+export function __resetRecheckForTests(): void {
+  rechecking = null;
+  lastRecheck = 0;
+}
+
 export async function completeSignIn(tokens: TokenPair, email: string): Promise<'signedIn' | 'noAccess'> {
   setTokens(tokens);
   return loadStaff(email);
