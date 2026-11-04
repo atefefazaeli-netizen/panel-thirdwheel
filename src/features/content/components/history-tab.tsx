@@ -16,7 +16,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime, formatRelative } from '@/lib/format';
-import { useContentChanges, useContentVersion, useContentVersions, useRollbackContent } from '../api/queries';
+import { useContentChanges, useContentVersion, useContentVersions } from '../api/queries';
+import { partLabel, SEEDED_LABEL } from '../lib/review';
 import type { ContentItem, ContentVersion } from '../api/types';
 import { SnapshotView } from './snapshot-view';
 
@@ -35,17 +36,26 @@ const ACTION_LABEL: Record<string, string> = {
   imported: 'Imported',
 };
 
-const who = (id: string, email: string | null) => (id === 'workbook' ? 'Workbook (clinician-cleared)' : (email ?? id));
+const who = (id: string, email: string | null) => (id === 'workbook' ? 'Release 1 bundle (seed)' : (email ?? id));
 const rollbackSchema = z.object({ note: z.string().trim().max(2000) });
 
-export function HistoryTab({ item }: { item: ContentItem }) {
+export function HistoryTab({
+  item,
+  dirty = false,
+  onRollback,
+}: {
+  item: ContentItem;
+  /** Unsaved edits on the page: rolling back would replace what they are based on. */
+  dirty?: boolean;
+  /** Rolls back with the page's revision (409 handling lives on the page). */
+  onRollback: (version: number, note?: string) => Promise<unknown>;
+}) {
   const versions = useContentVersions(item.id);
   const [page, setPage] = React.useState(1);
   const changes = useContentChanges(item.id, page);
   const [viewing, setViewing] = React.useState<number | null>(null);
   const [rollback, setRollback] = React.useState<ContentVersion | null>(null);
   const version = useContentVersion(item.id, viewing);
-  const doRollback = useRollbackContent(item.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -103,7 +113,12 @@ export function HistoryTab({ item }: { item: ContentItem }) {
                         <span className="block text-xs text-muted-foreground">by {v.byEmail}</span>
                       )}
                     </TableCell>
-                    <TableCell>{who(v.approvedBy, v.approvedByEmail)}</TableCell>
+                    <TableCell>
+                      {who(v.approvedBy, v.approvedByEmail)}
+                      {v.seeded && (
+                        <span className="block text-xs text-muted-foreground">{v.approvalLabel ?? SEEDED_LABEL}</span>
+                      )}
+                    </TableCell>
                     <TableCell title={formatDateTime(v.publishedAt)}>{formatRelative(v.publishedAt)}</TableCell>
                     <TableCell className="max-w-64 truncate whitespace-normal">{v.note}</TableCell>
                     <TableCell className="pr-6 text-right">
@@ -114,7 +129,13 @@ export function HistoryTab({ item }: { item: ContentItem }) {
                         </Button>
                         {v.version !== item.liveVersion && (
                           <RoleGate allow="admin">
-                            <Button variant="outline" size="sm" onClick={() => setRollback(v)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={dirty}
+                              title={dirty ? 'Save or discard your edits first' : undefined}
+                              onClick={() => setRollback(v)}
+                            >
                               <RotateCcwIcon />
                               Roll back
                             </Button>
@@ -150,6 +171,18 @@ export function HistoryTab({ item }: { item: ContentItem }) {
                       {who(c.by, c.byEmail)} · <time dateTime={c.at}>{formatRelative(c.at)}</time>
                     </span>
                   </div>
+                  {(c.meta?.selfApproved || c.meta?.acknowledgedHeld || c.meta?.clearedReview || c.meta?.restoredReview) && (
+                    <div className="flex flex-wrap gap-1">
+                      {c.meta.selfApproved && <StatusBadge status="self" tone="warning" label="Self-approved" />}
+                      {c.meta.acknowledgedHeld && <StatusBadge status="held" tone="danger" label="Held content acknowledged" />}
+                      {c.meta.clearedReview && (
+                        <StatusBadge status="cleared" tone="success" label={`Cleared review: ${c.meta.clearedReview.map(partLabel).join(', ')}`} />
+                      )}
+                      {c.meta.restoredReview && (
+                        <StatusBadge status="restored" tone="warning" label={`Needs review again: ${c.meta.restoredReview.map(partLabel).join(', ')}`} />
+                      )}
+                    </div>
+                  )}
                   {c.note && <p className="text-sm">“{c.note}”</p>}
                   {c.meta?.summary && c.meta.summary.length > 0 && (
                     <p className="font-mono text-xs text-muted-foreground">{c.meta.summary.join(' · ')}</p>
@@ -201,11 +234,11 @@ export function HistoryTab({ item }: { item: ContentItem }) {
         open={!!rollback}
         onOpenChange={(o) => !o && setRollback(null)}
         title={`Roll back to version ${rollback?.version}?`}
-        description={`That approved snapshot goes live again as version ${item.liveVersion + 1}. The draft, if any, stays as it is.`}
+        description={`That snapshot goes live again as version ${item.liveVersion + 1}, keeping its original approver${rollback?.seeded ? ' (the seed: its clinical review flags come back)' : ''}. You are recorded as the one who rolled back. The draft, if any, stays as it is.`}
         schema={rollbackSchema}
         defaultValues={{ note: '' }}
         submitLabel="Roll back"
-        onSubmit={(v) => doRollback.mutateAsync({ version: rollback!.version, note: v.note || undefined })}
+        onSubmit={(v) => onRollback(rollback!.version, v.note || undefined)}
       >
         {(f) => <FormFieldTextarea control={f.control} name="note" label="Why (optional)" rows={3} maxLength={2000} />}
       </FormDialog>

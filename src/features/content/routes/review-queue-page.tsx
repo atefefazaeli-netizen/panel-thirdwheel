@@ -1,20 +1,27 @@
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { BookOpenCheckIcon, CheckCircle2Icon, ExternalLinkIcon, MessageSquareWarningIcon } from 'lucide-react';
 import * as React from 'react';
+import { toast } from 'sonner';
 import { z } from 'zod';
 import { EmptyState, ErrorState, FormDialog, FormFieldTextarea, PageHeader, RoleGate } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { errorMessage } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useRoles } from '@/stores/session';
 import { useApproveContent, useContentItem, useContentList, useRequestChanges } from '../api/queries';
+import type { ContentItem } from '../api/types';
+import { ApproveDialog } from '../components/approve-dialog';
+import { ConflictBanner } from '../components/conflict-banner';
 import { DiffView } from '../components/diff-view';
+import { HeldBadge, HeldBanner, NeedsReviewBadge, ProvenancePanel } from '../components/review-status';
+import { isConflict } from '../lib/review';
 import { KIND_LABEL } from '../lib/labels';
 
 const route = getRouteApi('/_app/review');
-const optionalNote = z.object({ note: z.string().trim().max(2000) });
 const requiredNote = z.object({ note: z.string().trim().min(1, 'Say what needs to change.').max(2000) });
 
 export function ReviewQueuePage() {
@@ -85,23 +92,51 @@ export function ReviewQueuePage() {
 
 function ReviewDetail({ id }: { id: string }) {
   const item = useContentItem(id);
-  const approve = useApproveContent(id);
-  const changes = useRequestChanges(id);
-  const [dialog, setDialog] = React.useState<null | 'approve' | 'changes'>(null);
-
   if (item.error) return <ErrorState error={item.error} onRetry={() => void item.refetch()} />;
   if (!item.data) return <Skeleton className="h-96" />;
-  const d = item.data.draft;
+  return <ReviewPane id={id} first={item.data} />;
+}
+
+function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
+  const item = useContentItem(id);
+  const approve = useApproveContent(id);
+  const changes = useRequestChanges(id);
+  const { user } = useRoles();
+  const [dialog, setDialog] = React.useState<null | 'approve' | 'changes'>(null);
+  // The copy the clinician is reading. A newer server copy never replaces it silently: approve and
+  // request changes carry its revision, and a change shows the conflict banner instead.
+  const [pinned, setPinned] = React.useState<ContentItem>(first);
+  const [conflict, setConflict] = React.useState(false);
+  const moved = conflict || (!!item.data && item.data.rev !== pinned.rev);
+  const d = pinned.draft;
   const inReview = d?.state === 'in_review';
+
+  const act = async (fn: () => Promise<ContentItem>, done: string) => {
+    try {
+      setPinned(await fn());
+      toast.success(done);
+    } catch (e) {
+      if (isConflict(e)) {
+        setConflict(true);
+        return;
+      }
+      toast.error(errorMessage(e));
+      throw e;
+    }
+  };
+  const reload = async () => {
+    const r = await item.refetch();
+    if (r.data) setPinned(r.data);
+    setConflict(false);
+  };
 
   return (
     <Card className="min-w-0 gap-4">
       <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-col gap-1">
-          <CardTitle className="truncate text-lg">{(d?.snapshot.catalog.title as string) ?? item.data.id}</CardTitle>
+          <CardTitle className="truncate text-lg">{(d?.snapshot.catalog.title as string) ?? pinned.id}</CardTitle>
           <CardDescription>
-            <span className="font-mono">{item.data.code ?? 'New'}</span> ·{' '}
-            {KIND_LABEL[item.data.kind] ?? item.data.kind}
+            <span className="font-mono">{pinned.code ?? 'New'}</span> · {KIND_LABEL[pinned.kind] ?? pinned.kind}
             {d && (
               <>
                 {' '}
@@ -110,6 +145,10 @@ function ReviewDetail({ id }: { id: string }) {
               </>
             )}
           </CardDescription>
+          <div className="flex flex-wrap gap-1">
+            {pinned.needsReview && <NeedsReviewBadge />}
+            {pinned.heldMatch && <HeldBadge />}
+          </div>
           {d?.note && <p className="text-sm">“{d.note}”</p>}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -121,7 +160,7 @@ function ReviewDetail({ id }: { id: string }) {
           </Button>
           {inReview && (
             <RoleGate allow="clinician" mode="disable">
-              <Button variant="outline" size="sm" onClick={() => setDialog('changes')}>
+              <Button variant="outline" size="sm" disabled={moved} onClick={() => setDialog('changes')}>
                 <MessageSquareWarningIcon />
                 Request changes
               </Button>
@@ -131,6 +170,7 @@ function ReviewDetail({ id }: { id: string }) {
             <RoleGate allow="clinician" mode="disable">
               <Button
                 size="sm"
+                disabled={moved}
                 className="bg-success text-success-foreground hover:bg-success/90"
                 onClick={() => setDialog('approve')}
               >
@@ -141,30 +181,28 @@ function ReviewDetail({ id }: { id: string }) {
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-3">
+        {moved && <ConflictBanner localJson={null} onReload={() => void reload()} />}
+        {pinned.heldMatch && <HeldBanner match={pinned.heldMatch} />}
+        {pinned.needsReview && <ProvenancePanel item={pinned} />}
         {!inReview ? (
           <EmptyState title="Not in review any more" description="Someone already acted on this draft." />
         ) : (
           <DiffView
-            before={item.data.live}
+            before={pinned.live}
             after={d!.snapshot}
-            beforeLabel={item.data.live ? `Live v${item.data.liveVersion}` : 'Live'}
+            beforeLabel={pinned.live ? `Live v${pinned.liveVersion}` : 'Live'}
             afterLabel="Draft"
           />
         )}
       </CardContent>
-      <FormDialog
+      <ApproveDialog
+        item={pinned}
+        userId={user?.userId}
         open={dialog === 'approve'}
         onOpenChange={(o) => !o && setDialog(null)}
-        title="Approve and publish"
-        description={`The draft goes live as version ${item.data.liveVersion + 1}.`}
-        schema={optionalNote}
-        defaultValues={{ note: '' }}
-        submitLabel="Approve and publish"
-        onSubmit={(v) => approve.mutateAsync(v.note || undefined)}
-      >
-        {(f) => <FormFieldTextarea control={f.control} name="note" label="Note (optional)" rows={3} maxLength={2000} />}
-      </FormDialog>
+        onApprove={(v) => act(() => approve.mutateAsync({ rev: pinned.rev, ...v }), 'Approved and published')}
+      />
       <FormDialog
         open={dialog === 'changes'}
         onOpenChange={(o) => !o && setDialog(null)}
@@ -173,7 +211,7 @@ function ReviewDetail({ id }: { id: string }) {
         schema={requiredNote}
         defaultValues={{ note: '' }}
         submitLabel="Send back"
-        onSubmit={(v) => changes.mutateAsync(v.note)}
+        onSubmit={(v) => act(() => changes.mutateAsync({ rev: pinned.rev, note: v.note }), 'Sent back with your note')}
       >
         {(f) => (
           <FormFieldTextarea control={f.control} name="note" label="What needs to change" rows={4} maxLength={2000} />

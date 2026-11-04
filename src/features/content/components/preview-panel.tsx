@@ -3,7 +3,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { categoryLabel, playsField, WHERE_LABEL } from '../lib/labels';
-import { firstDeckEntry } from '../lib/preview';
+import { deckEntries } from '../lib/preview';
 import type { CardForm, EditorValues, StepForm } from '../schemas/editor';
 
 function CardPreview({ card }: { card: CardForm }) {
@@ -13,8 +13,8 @@ function CardPreview({ card }: { card: CardForm }) {
       <p className="text-[17px] leading-snug font-bold">{card.text || 'Card text'}</p>
       {card.pick.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          {card.pick.map((o) => (
-            <span key={o} className="rounded-xl bg-[#EAEFF6] px-3 py-2 text-[12px] font-semibold">
+          {card.pick.map((o, k) => (
+            <span key={k} className="rounded-xl bg-[#EAEFF6] px-3 py-2 text-[12px] font-semibold">
               {o}
             </span>
           ))}
@@ -53,17 +53,22 @@ function StepPreview({ step, index, total }: { step: StepForm; index: number; to
   );
 }
 
-/** A rough phone render of the item: the Explore card and the first card or step, live as you type. */
+/**
+ * A rough phone frame: the Explore card, then every card, step or deck entry, live as you type. It is
+ * NOT the app's rendering (each type has its own screen); it only helps reading the content in order.
+ */
 export function PreviewPanel({ kind }: { kind: string }) {
   const { control } = useFormContext<EditorValues>();
   const catalog = useWatch({ control, name: 'catalog' });
   const body = useWatch({ control, name: 'body' });
   const plays = playsField(kind);
-  const deck = plays === 'deck' ? firstDeckEntry(body.deckText) : null;
+  const deck = plays === 'deck' ? deckEntries(body.deckText) : [];
 
   return (
     <section aria-label="Phone preview" className="flex flex-col items-center gap-2">
-      <p className="self-start text-xs font-medium tracking-wide text-muted-foreground uppercase">Preview</p>
+      <p className="self-start text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        Approximate preview, not the app's rendering
+      </p>
       <div className="w-full max-w-[300px] rounded-[2.2rem] border-[7px] border-[#1A2B4C] bg-[#EAEFF6] p-3 font-sans text-[#1A2B4C] shadow-lg dark:border-[#0b1222]">
         <div className="mx-auto mb-3 h-1.5 w-16 rounded-full bg-[#1A2B4C]/20" aria-hidden />
         <p className="mb-2 text-[11px] font-semibold text-[#626B7F]">
@@ -108,34 +113,60 @@ export function PreviewPanel({ kind }: { kind: string }) {
           </span>
         </div>
 
-        <div className="mt-4 min-h-48 rounded-2xl bg-white p-4 shadow-sm">
+        <div
+          className="mt-4 max-h-[28rem] min-h-48 overflow-y-auto rounded-2xl bg-white p-4 shadow-sm"
+          tabIndex={0}
+          aria-label="Preview content"
+        >
           {plays === 'cards' &&
-            (body.cards[0] ? (
-              <CardPreview card={body.cards[0]} />
+            (body.cards.length ? (
+              <ol className="flex flex-col gap-4">
+                {body.cards.map((card, i) => (
+                  <li key={i} className="flex flex-col gap-1 border-b border-[#EAEFF6] pb-3 last:border-0">
+                    <p className="text-[11px] font-semibold text-[#626B7F]">
+                      Card {i + 1} of {body.cards.length}
+                    </p>
+                    <CardPreview card={card} />
+                  </li>
+                ))}
+              </ol>
             ) : (
               <p className="text-[12px] text-[#626B7F]">No cards yet.</p>
             ))}
           {plays === 'steps' && (
             <div className="flex flex-col gap-3">
               {body.intro && <p className="text-[12px] text-[#4E5A73]">{body.intro}</p>}
-              {body.steps[0] ? (
-                <StepPreview step={body.steps[0]} index={0} total={body.steps.length} />
+              {body.steps.length ? (
+                <ol className="flex flex-col gap-4">
+                  {body.steps.map((step, i) => (
+                    <li key={i} className="border-b border-[#EAEFF6] pb-3 last:border-0">
+                      <StepPreview step={step} index={i} total={body.steps.length} />
+                    </li>
+                  ))}
+                </ol>
               ) : (
                 <p className="text-[12px] text-[#626B7F]">No steps yet.</p>
               )}
             </div>
           )}
           {plays === 'deck' &&
-            (deck ? (
-              <div className="flex flex-col gap-3">
-                <p className="text-[17px] leading-snug font-bold">{deck.title}</p>
-                {deck.line && <p className="text-[13px] text-[#4E5A73]">{deck.line}</p>}
-                {deck.options?.map((o) => (
-                  <span key={o} className="rounded-xl bg-[#EAEFF6] px-3 py-2 text-[12px] font-semibold">
-                    {o}
-                  </span>
+            (deck.length ? (
+              <ol className="flex flex-col gap-4">
+                {deck.map((e, i) => (
+                  <li key={i} className="flex flex-col gap-2 border-b border-[#EAEFF6] pb-3 last:border-0">
+                    <p className="text-[11px] font-semibold text-[#626B7F]">
+                      {i + 1} of {deck.length}
+                    </p>
+                    <p className="text-[15px] leading-snug font-bold">{e.title}</p>
+                    {e.line && <p className="text-[13px] text-[#4E5A73]">{e.line}</p>}
+                    {e.options?.map((o, k) => (
+                      <span key={k} className="rounded-xl bg-[#EAEFF6] px-3 py-2 text-[12px] font-semibold">
+                        {o}
+                      </span>
+                    ))}
+                  </li>
                 ))}
-              </div>
+              </ol>
             ) : (
               <p className="text-[12px] text-[#626B7F]">The deck has no rounds yet.</p>
             ))}

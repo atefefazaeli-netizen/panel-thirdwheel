@@ -86,6 +86,12 @@ The trade-off: `sessionStorage` is readable by script on the page, so an XSS cou
 - `workflowFor(item, roles, { dirty, valid, busy })` decides which buttons show and why one is disabled. Admins: Save draft, Discard, Submit for review, Unpublish / Restore. Clinicians: Approve and publish, Request changes (note required) on a draft in review. Both roles see both sets.
 - Leaving with unsaved edits asks first (router blocker and `beforeunload`).
 - The review queue compares live and draft field by field; cards, steps and deck rounds compare one by one.
+- **Concurrency (audit, Nov 5).** The editor is based on one revision of the item (`rev`) and sends it as `expectedRev` on every write. A newer server copy replaces the form only when there are no unsaved edits; otherwise, and on a 409 `CONTENT_CONFLICT`, the page shows "Changed by someone else", keeps the local edits, offers "Copy my edits (JSON)" and disables writes until the latest is loaded. The review queue pins the copy the clinician is reading and approves exactly that revision.
+- **Clinical review and held content.** Seeded items show "Needs clinical review" with the server's provenance (AI-written Do steps, hand-set options, deck lines written in the app) and the label "Seeded from the Release 1 bundle, not a sign-off in this system". The list filters on it. A held-list match shows a red banner; the approve dialog requires the acknowledgement, warns when the clinician last edited the draft (self-approval is allowed and recorded), and says which review flags the approval clears.
+- **Server field errors.** `INVALID_CONTENT` details are mapped onto the editor's fields (`content/lib/review.ts`) and listed above the tabs.
+- **Deck editor.** Decks that play a list of questions (V-TX, V-SL, V-RK, V-AV, V-SC, V-NEW-PL, V-PR, V-GU, and V-FL / V-NH statements: 62 of the 106 seeded decks) get a Questions editor (text, intro, follow-up, options; add, remove, reorder; other keys kept). The other 14 types stay JSON (`content/lib/deck.ts`).
+- **Preview.** Every card, step or deck entry in a scrollable phone frame, labelled "Approximate preview, not the app's rendering".
+- **Import.** JSON only (the workbook .xlsx goes through `scripts/release1-workbook.py`). The preview flags ids listed twice; "Check against the server" runs the import as a dry run (existing ids, server validation, held list) and the result lists each item.
 
 ## 7. The mock API
 

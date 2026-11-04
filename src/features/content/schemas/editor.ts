@@ -5,6 +5,7 @@
 // quizzes need a card). Keys the form does not edit are carried through untouched.
 import { z } from 'zod';
 import { parseJson } from '@/lib/json';
+import { parseStructuredDeck, structuredIssues } from '../lib/deck';
 import { WHERES, type ContentCard, type ContentSnapshot, type DoPlanStep } from '../api/types';
 
 export const LIMITS = {
@@ -125,7 +126,8 @@ export function deckIssues(deckText: string, required: boolean): string | null {
   const v = parsed.value;
   if (!v || typeof v !== 'object' || Array.isArray(v)) return 'The deck must be an object.';
   if (typeof (v as Json).type !== 'string') return 'The deck needs a "type" (for example "V-YNM").';
-  return null;
+  const structured = parseStructuredDeck(deckText);
+  return structured ? structuredIssues(structured) : null;
 }
 
 /* ---------- Codec ---------- */
