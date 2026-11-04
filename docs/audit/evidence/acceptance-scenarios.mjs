@@ -27,7 +27,9 @@ async function signIn(email) {
   };
   let s = await call('auth/login/start', { email });
   if (!s.body?.ok) s = await call('auth/signup/start', { email });
-  const v = await call('auth/verify', { session: s.body.session, code: '123456' });
+  let v = await call('auth/verify', { session: s.body.session, code: '123456' });
+  // API v1.6.0+: a new account needs an 18+ birthday before it exists (signup/complete).
+  if (v.body?.birthdayRequired) v = await call('auth/signup/complete', { ticket: v.body.ticket, birthday: '1990-05-04' });
   if (!v.body?.token) throw new Error(`sign-in failed for ${email}: ${v.status}`);
   return { token: v.body.token, refresh: v.body.refreshToken, userId: v.body.userId };
 }

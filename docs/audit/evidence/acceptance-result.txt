@@ -10,7 +10,7 @@ PASS 2a seeded item is not a clinician sign-off :: Seeded from the Release 1 bun
 PASS 2b admin saves a draft with expectedRev :: 200
 PASS 2c admin cannot approve (clinician only)
 PASS 2d clinician approves the reviewed revision :: 200 v2
-PASS 2e app feed serves the approved title :: My perfect day (mw1ss79g)
+PASS 2e app feed serves the approved title :: My perfect day (mw1tf8hm)
 PASS 2f app feed carries no review fields
 PASS 3a AI-written Do steps flagged needsReview :: ["steps"]
 PASS 3b held title is detected (heldMatch) :: 201 {"reasons":[{"field":"title","value":"Repair walk, 20 minutes","held":{"type":"Do","world":"Clear the air","item":"Repair walk, 20 minutes","why":"Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"}}]}
@@ -33,7 +33,7 @@ PASS 6c flag carries no text field
 PASS 6d plain user 403 on safety log
 PASS 7a GET one ticket by id :: 200
 PASS 7b unknown ticket 404 TICKET_NOT_FOUND
-PASS 7c closing a ticket is audited :: support.ticket_status support_ticket:6aeadf6d691bf3b75063a29e
+PASS 7c closing a ticket is audited :: support.ticket_status support_ticket:6aeae3a0e98346f6f9ad49c7
 PASS 8a no API keys in settings response
 PASS 8b AI settings save, stale save gets 409 SETTINGS_CONFLICT :: 200/409
 PASS 8c provider without key refused :: 400 PROVIDER_NOT_CONFIGURED
