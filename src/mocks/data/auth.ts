@@ -9,10 +9,14 @@ export interface OtpSession {
   email: string;
   attempts: number;
   locked: boolean;
+  /** Started with signup/start: verify answers birthdayRequired (API v1.6.0, adults only). */
+  signup?: boolean;
 }
 
 export interface AuthState {
   otps: Map<string, OtpSession>;
+  /** signup/complete tickets ("sut_..."), single use. */
+  tickets: Map<string, { email: string; expiresAt: number }>;
   access: Map<string, { user: StaffUser; exp: number }>;
   refresh: Map<string, StaffUser>;
   staff: Map<string, StaffUser>;
@@ -31,5 +35,5 @@ export function rolesFor(email: string): string[] {
 }
 
 export function seedAuth(): AuthState {
-  return { otps: new Map(), access: new Map(), refresh: new Map(), staff: new Map() };
+  return { otps: new Map(), tickets: new Map(), access: new Map(), refresh: new Map(), staff: new Map() };
 }

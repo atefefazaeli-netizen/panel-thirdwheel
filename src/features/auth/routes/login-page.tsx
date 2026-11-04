@@ -7,13 +7,17 @@ import { DemoBanner, ThemeToggle } from '@/components/shared';
 import { env } from '@/config/env';
 import { useSession } from '@/stores/session';
 import { completeSignIn } from '../api/session';
+import { BirthdayStep } from '../components/birthday-step';
 import { CodeStep } from '../components/code-step';
 import { EmailStep } from '../components/email-step';
 import { NoAccess } from '../components/no-access';
 
 const route = getRouteApi('/login');
 
-type Step = { kind: 'email' } | { kind: 'code'; email: string; session: string; resendAt: number };
+type Step =
+  | { kind: 'email' }
+  | { kind: 'code'; email: string; session: string; resendAt: number }
+  | { kind: 'birthday'; email: string; ticket: string };
 
 const ENDED_COPY: Record<string, string> = {
   suspended: 'This account is suspended.',
@@ -59,11 +63,15 @@ export function LoginPage() {
         ) : (
           <>
             <CardHeader>
-              <CardTitle className="text-lg">{step.kind === 'email' ? 'Sign in' : 'Check your email'}</CardTitle>
+              <CardTitle className="text-lg">
+                {step.kind === 'email' ? 'Sign in' : step.kind === 'code' ? 'Check your email' : 'Your birthday'}
+              </CardTitle>
               <CardDescription>
                 {step.kind === 'email'
                   ? 'Staff sign in with a one-time code. No passwords.'
-                  : 'Enter the code to finish signing in.'}
+                  : step.kind === 'code'
+                    ? 'Enter the code to finish signing in.'
+                    : 'One more step before your first sign-in.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -81,6 +89,16 @@ export function LoginPage() {
                     setStep({ kind: 'code', email, session, resendAt });
                   }}
                 />
+              ) : step.kind === 'birthday' ? (
+                <BirthdayStep
+                  ticket={step.ticket}
+                  onRestart={() => setStep({ kind: 'email' })}
+                  onVerified={async (tokens) => {
+                    const result = await completeSignIn(tokens, step.email);
+                    if (result === 'signedIn') await navigate({ to: redirect ?? '/', replace: true });
+                    else setStep({ kind: 'email' });
+                  }}
+                />
               ) : (
                 <CodeStep
                   email={step.email}
@@ -88,6 +106,7 @@ export function LoginPage() {
                   resendAt={step.resendAt}
                   onResent={(resendAt) => setStep({ ...step, resendAt })}
                   onBack={() => setStep({ kind: 'email' })}
+                  onBirthdayRequired={(ticket) => setStep({ kind: 'birthday', email: step.email, ticket })}
                   onVerified={async (tokens) => {
                     const result = await completeSignIn(tokens, step.email);
                     if (result === 'signedIn') await navigate({ to: redirect ?? '/', replace: true });

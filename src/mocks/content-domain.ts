@@ -60,7 +60,10 @@ export interface Actor {
 }
 
 /** Stored item: the API view without its computed fields, plus the server-only revision. */
-export interface StoredItem extends Omit<ContentItem, 'liveSeeded' | 'liveApprovalLabel' | 'needsReview' | 'heldMatch'> {
+export interface StoredItem extends Omit<
+  ContentItem,
+  'liveSeeded' | 'liveApprovalLabel' | 'needsReview' | 'heldMatch'
+> {
   liveRevision: number;
 }
 
@@ -73,7 +76,14 @@ export interface StoredVersion extends Omit<ContentVersionDetail, 'seeded' | 'ap
 export function provenanceFromSeed(id: string): ContentProvenance | null {
   const p = SEED_PROVENANCE[id];
   if (!p) return null;
-  return { source: p.source, cleared: [...p.cleared], flagged: p.needsReview.map((n) => ({ ...n })), needsReview: p.needsReview.map((n) => ({ ...n })), notes: [...p.notes], clearedBy: null };
+  return {
+    source: p.source,
+    cleared: [...p.cleared],
+    flagged: p.needsReview.map((n) => ({ ...n })),
+    needsReview: p.needsReview.map((n) => ({ ...n })),
+    notes: [...p.notes],
+    clearedBy: null,
+  };
 }
 
 const norm = (s: string) =>
@@ -95,7 +105,12 @@ export function heldMatchOf(catalog: Record<string, unknown> | null | undefined)
     if (whole)
       for (const field of ['category', 'world', 'sub'] as const) {
         const v = catalog[field];
-        const keys = [norm(h.world), norm(h.world).replace(/\bthe\b /g, '').trim()];
+        const keys = [
+          norm(h.world),
+          norm(h.world)
+            .replace(/\bthe\b /g, '')
+            .trim(),
+        ];
         if (typeof v === 'string' && v && keys.includes(norm(v))) reasons.push({ field, value: v, held: h });
       }
   }
@@ -409,7 +424,11 @@ export function approveDraft(
       draft: null,
       provenance:
         p && cleared.length
-          ? { ...p, needsReview: [], clearedBy: { by: actor.id, byEmail: actor.email, at: now, version, via: 'approved' } }
+          ? {
+              ...p,
+              needsReview: [],
+              clearedBy: { by: actor.id, byEmail: actor.email, at: now, version, via: 'approved' },
+            }
           : p,
     }),
     change: entry('approved', actor, now, n, meta),
