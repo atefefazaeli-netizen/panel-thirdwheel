@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/format';
 import { useUser } from '../api/queries';
 import { UserActions } from '../components/user-actions';
-import { DUR_LABEL, KIDS_LABEL, LIVING_LABEL, PLAN_LABEL } from '../lib/labels';
+import { DUR_LABEL, KIDS_LABEL, LIVING_LABEL, PLAN_LABEL, plusSourceLabel } from '../lib/labels';
 
 const route = getRouteApi('/_app/users/$id');
 
@@ -57,6 +57,7 @@ function UserDetail() {
       </div>
     );
   const { account, profile, couple, subscription, safety, support } = q.data;
+  const down = new Set(q.data.unavailable ?? []);
   const staff = account.roles.filter((r) => r === 'admin' || r === 'clinician');
 
   return (
@@ -134,6 +135,17 @@ function UserDetail() {
                 rows={[
                   ['Plan', PLAN_LABEL[subscription.state]],
                   ['Plus', subscription.plus ? 'Yes' : 'No'],
+                  [
+                    'Source',
+                    <span key="src" className="flex flex-wrap items-center gap-1.5">
+                      {plusSourceLabel(subscription)}
+                      {subscription.verification === 'mock' && (
+                        <Badge variant="outline" className="border-warning text-warning">
+                          Unverified
+                        </Badge>
+                      )}
+                    </span>,
+                  ],
                   ['Renews or ends', subscription.renewsAt ? formatDate(subscription.renewsAt) : null],
                   [
                     'Admin grant',
@@ -192,6 +204,8 @@ function UserDetail() {
                   ['Onboarded', profile.onboarded ? 'Yes' : 'Not finished'],
                 ]}
               />
+            ) : down.has('profile') ? (
+              <EmptyState title="Not available" description="The profile service did not answer. Try again later." />
             ) : (
               <EmptyState title="No profile yet" description="They signed up but have not set up a profile." />
             )}
@@ -230,6 +244,8 @@ function UserDetail() {
                     ],
                   ]}
                 />
+              ) : down.has('couple') ? (
+                <p className="text-sm text-muted-foreground">Not available: the partners service did not answer.</p>
               ) : (
                 <p className="text-sm text-muted-foreground">Not linked with a partner.</p>
               )}

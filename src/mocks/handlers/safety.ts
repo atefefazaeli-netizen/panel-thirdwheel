@@ -9,6 +9,7 @@ import { apiError, badRequest, mockId, nowIso, p, paginate, readJson } from '../
 
 const KINDS = ['crisis', 'safety', 'heat'];
 const APP_SURFACES = ['third-ear', 'quiz', 'answer', 'other'];
+const ALL_SURFACES = [...APP_SURFACES, 'third-ear-server'];
 const FOLD_MS = 10 * 60_000;
 
 const find = (id: unknown) => db().safety.flags.find((f) => f.id === String(id));
@@ -82,6 +83,9 @@ export const safetyHandlers = [
     guard(request, 'staff', () => {
       const url = new URL(request.url);
       const q = url.searchParams;
+      const surface = q.get('surface');
+      if (surface && !ALL_SURFACES.includes(surface))
+        return badRequest(`surface must be one of the following values: ${ALL_SURFACES.join(', ')}`);
       const from = q.get('from');
       const to = q.get('to');
       const rows = db()
@@ -90,6 +94,7 @@ export const safetyHandlers = [
           if (q.get('level') && f.level !== q.get('level')) return false;
           if (q.get('kind') && f.kind !== q.get('kind')) return false;
           if (q.get('userId') && f.userId !== q.get('userId')) return false;
+          if (q.get('surface') && f.surface !== q.get('surface')) return false;
           if (from && f.lastAt < new Date(from).toISOString()) return false;
           // A date counts its whole UTC day.
           if (to && f.lastAt >= new Date(to.length === 10 ? Date.parse(to) + 86_400_000 : Date.parse(to)).toISOString())

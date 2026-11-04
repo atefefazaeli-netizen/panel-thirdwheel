@@ -11,7 +11,7 @@ export const safetySearchSchema = z.object({
   status: optionalEnum(['open', 'reviewed', 'escalated']),
   level: optionalEnum(['high', 'medium', 'low']),
   kind: optionalEnum(['crisis', 'safety', 'heat']),
-  /** Not an API filter: narrows the loaded page (the contract has no surface query). */
+  /** Sent to the API (GET admin/safety/flags?surface=), so it filters every page. */
   surface: optionalEnum(['third-ear', 'third-ear-server', 'quiz', 'answer', 'other']),
   userId: optionalString,
   from: isoDate,

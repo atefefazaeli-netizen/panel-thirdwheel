@@ -1,4 +1,6 @@
-// The support module's existing admin routes (backend support.controller.ts, AdminTicketView).
+// The support module's admin routes (backend support.controller.ts, AdminTicketView):
+// list, one ticket (GET support/tickets/:id), status and screenshot. There are no replies,
+// internal notes, assignment or priority: support replies by email (open product decisions).
 
 export type TicketStatus = 'open' | 'closed';
 export type TicketKind = 'message' | 'problem';

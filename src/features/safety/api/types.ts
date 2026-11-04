@@ -49,6 +49,8 @@ export interface SafetyFlagQuery {
   status?: SafetyFlagStatus;
   level?: SafetyLevel;
   kind?: SafetyKind;
+  /** Server-side filter (any surface, the server's own check included). */
+  surface?: SafetySurface;
   userId?: string;
   from?: string;
   to?: string;
