@@ -32,3 +32,29 @@ export function codeFailureMessage(code: string, attempts = 0): string {
       return 'Could not check the code.';
   }
 }
+
+/** First sign-in (API v1.6.0+): the birthday step. The API decides 18+; this only checks the shape. */
+export const birthdaySchema = z.object({
+  birthday: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your birthday.')
+    .refine((v) => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)), 'Enter a real date.'),
+});
+export type BirthdayValues = z.infer<typeof birthdaySchema>;
+
+/** Copy for the signup/complete refusals. */
+export function birthdayFailureMessage(code: string | null): string {
+  switch (code) {
+    case 'UNDER_18':
+      return 'Thirdwheel accounts are for adults 18 and over. Nothing was saved.';
+    case 'BIRTHDAY_IN_FUTURE':
+      return 'That date is in the future.';
+    case 'BIRTHDAY_INVALID':
+      return 'Enter a real date.';
+    case 'SIGNUP_TICKET_INVALID':
+      return 'This sign-in timed out. Start again with your email.';
+    default:
+      return 'Could not finish signing in.';
+  }
+}

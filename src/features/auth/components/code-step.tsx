@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
-import { authApi } from '../api/auth-api';
+import { authApi, needsBirthday } from '../api/auth-api';
 import { codeFailureMessage, codeSchema, type CodeValues } from '../schemas/login';
 
 export interface CodeStepProps {
@@ -15,6 +15,8 @@ export interface CodeStepProps {
   resendAt: number;
   onResent: (resendAt: number) => void;
   onVerified: (tokens: { token: string; refreshToken: string; expiresIn: number }) => Promise<void>;
+  /** First sign-in: the API asks the birthday before it creates the account (adults only). */
+  onBirthdayRequired: (ticket: string, ticketExpiresAt: number) => void;
   onBack: () => void;
 }
 
@@ -27,7 +29,15 @@ function useSecondsUntil(at: number) {
   return Math.max(0, Math.ceil((at - now) / 1000));
 }
 
-export function CodeStep({ email, session, resendAt, onResent, onVerified, onBack }: CodeStepProps) {
+export function CodeStep({
+  email,
+  session,
+  resendAt,
+  onResent,
+  onVerified,
+  onBirthdayRequired,
+  onBack,
+}: CodeStepProps) {
   const form = useForm<CodeValues>({ resolver: zodResolver(codeSchema), defaultValues: { code: '' } });
   const wait = useSecondsUntil(resendAt);
   const [locked, setLocked] = React.useState(false);
@@ -38,6 +48,10 @@ export function CodeStep({ email, session, resendAt, onResent, onVerified, onBac
       if (!r.ok) {
         setLocked(r.locked || r.code === 'CODE_EXPIRED');
         form.setError('code', { message: codeFailureMessage(r.code, r.attempts) });
+        return;
+      }
+      if (needsBirthday(r)) {
+        onBirthdayRequired(r.ticket, r.ticketExpiresAt);
         return;
       }
       await onVerified(r);

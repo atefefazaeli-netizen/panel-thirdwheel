@@ -1,5 +1,7 @@
 // auth.controller.ts routes the panel uses: login/start → verify (mode login), resend, refresh,
-// logout. Plus GET admin/me (ADMIN_API.md › Dashboard).
+// logout. Plus GET admin/me (ADMIN_API.md › Dashboard). Since API v1.6.0 a first sign-in
+// (signup/start) answers birthdayRequired at verify, and signup/complete creates the account for
+// an 18+ birthday only (403 UNDER_18).
 import { http, HttpResponse } from 'msw';
 import type { StaffUser } from '@/stores/session';
 import { ACCESS_TTL_S, MOCK_CODE, rolesFor } from '../data/auth';
@@ -42,8 +44,25 @@ export const authHandlers = [
     const { email } = await readJson<{ email?: string }>(request);
     if (!email || !EMAIL_RE.test(email)) return badRequest('Send a valid email or phone');
     const session = `otp_${randomToken(20)}`;
-    db().auth.otps.set(session, { email: email.toLowerCase(), attempts: 0, locked: false });
+    db().auth.otps.set(session, { email: email.toLowerCase(), attempts: 0, locked: false, signup: true });
     return HttpResponse.json({ ok: true, session, resendAt: Date.now() + 30_000 });
+  }),
+
+  http.post(p('auth/signup/complete'), async ({ request }) => {
+    const { ticket, birthday, today } = await readJson<{ ticket?: string; birthday?: string; today?: string }>(request);
+    if (!birthday || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return badRequest('birthday must be YYYY-MM-DD');
+    const t = ticket ? db().auth.tickets.get(ticket) : undefined;
+    if (!ticket || !t || t.expiresAt < Date.now())
+      return apiError(401, 'This sign-up timed out. Start again.', 'SIGNUP_TICKET_INVALID');
+    const day = today ?? new Date().toISOString().slice(0, 10);
+    if (birthday > day) return apiError(400, 'That date is in the future.', 'BIRTHDAY_IN_FUTURE');
+    db().auth.tickets.delete(ticket);
+    const [by, bm, bd] = birthday.split('-').map(Number);
+    const [ty, tm, td] = day.split('-').map(Number);
+    const age = ty - by - (tm < bm || (tm === bm && td < bd) ? 1 : 0);
+    if (age < 18) return apiError(403, 'Thirdwheel is for adults 18 and over.', 'UNDER_18');
+    const user = staffFor(t.email);
+    return HttpResponse.json({ ok: true, mode: 'signup', isNew: true, userId: user.userId, ...issueTokens(user) });
   }),
 
   http.post(p('auth/resend'), async ({ request }) => {
@@ -73,6 +92,12 @@ export const authHandlers = [
       });
     }
     db().auth.otps.delete(session);
+    if (otp.signup) {
+      const ticket = `sut_${randomToken(24)}`;
+      const ticketExpiresAt = Date.now() + 15 * 60_000;
+      db().auth.tickets.set(ticket, { email: otp.email, expiresAt: ticketExpiresAt });
+      return HttpResponse.json({ ok: true, mode: 'signup', birthdayRequired: true, ticket, ticketExpiresAt });
+    }
     const user = staffFor(otp.email);
     return HttpResponse.json({ ok: true, mode: 'login', userId: user.userId, ...issueTokens(user) });
   }),
