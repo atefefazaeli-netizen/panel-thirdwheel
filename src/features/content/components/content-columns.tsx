@@ -5,6 +5,7 @@ import { formatRelative } from '@/lib/format';
 import type { ContentSummary } from '../api/types';
 import { categoryLabel, contentState, KIND_LABEL, ONLY_LABEL } from '../lib/labels';
 import { ContentStateBadge } from './content-state-badge';
+import { HeldBadge, NeedsReviewBadge } from './review-status';
 
 const h = columnHelper<ContentSummary>();
 
@@ -53,7 +54,13 @@ export const contentColumns = h.columns([
     id: 'state',
     header: 'State',
     meta: { label: 'State' },
-    cell: (c) => <ContentStateBadge state={contentState(c.row.original)} version={c.row.original.liveVersion} />,
+    cell: (c) => (
+      <div className="flex flex-wrap gap-1">
+        <ContentStateBadge state={contentState(c.row.original)} version={c.row.original.liveVersion} />
+        {c.row.original.needsReview && <NeedsReviewBadge />}
+        {c.row.original.held && <HeldBadge />}
+      </div>
+    ),
   }),
   h.accessor('liveVersion', {
     header: 'Live',

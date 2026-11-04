@@ -3,17 +3,21 @@ import { InfoIcon } from 'lucide-react';
 import * as React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ThemeToggle } from '@/components/shared';
+import { DemoBanner, ThemeToggle } from '@/components/shared';
 import { env } from '@/config/env';
 import { useSession } from '@/stores/session';
 import { completeSignIn } from '../api/session';
+import { BirthdayStep } from '../components/birthday-step';
 import { CodeStep } from '../components/code-step';
 import { EmailStep } from '../components/email-step';
 import { NoAccess } from '../components/no-access';
 
 const route = getRouteApi('/login');
 
-type Step = { kind: 'email' } | { kind: 'code'; email: string; session: string; resendAt: number };
+type Step =
+  | { kind: 'email' }
+  | { kind: 'code'; email: string; session: string; resendAt: number }
+  | { kind: 'birthday'; email: string; ticket: string };
 
 const ENDED_COPY: Record<string, string> = {
   suspended: 'This account is suspended.',
@@ -36,6 +40,7 @@ export function LoginPage() {
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
+      {env.useMocks && <DemoBanner className="fixed inset-x-0 top-0 z-30" />}
       <div className="absolute top-3 right-3">
         <ThemeToggle />
       </div>
@@ -58,11 +63,15 @@ export function LoginPage() {
         ) : (
           <>
             <CardHeader>
-              <CardTitle className="text-lg">{step.kind === 'email' ? 'Sign in' : 'Check your email'}</CardTitle>
+              <CardTitle className="text-lg">
+                {step.kind === 'email' ? 'Sign in' : step.kind === 'code' ? 'Check your email' : 'Your birthday'}
+              </CardTitle>
               <CardDescription>
                 {step.kind === 'email'
                   ? 'Staff sign in with a one-time code. No passwords.'
-                  : 'Enter the code to finish signing in.'}
+                  : step.kind === 'code'
+                    ? 'Enter the code to finish signing in.'
+                    : 'One more step before your first sign-in.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -80,6 +89,16 @@ export function LoginPage() {
                     setStep({ kind: 'code', email, session, resendAt });
                   }}
                 />
+              ) : step.kind === 'birthday' ? (
+                <BirthdayStep
+                  ticket={step.ticket}
+                  onRestart={() => setStep({ kind: 'email' })}
+                  onVerified={async (tokens) => {
+                    const result = await completeSignIn(tokens, step.email);
+                    if (result === 'signedIn') await navigate({ to: redirect ?? '/', replace: true });
+                    else setStep({ kind: 'email' });
+                  }}
+                />
               ) : (
                 <CodeStep
                   email={step.email}
@@ -87,6 +106,7 @@ export function LoginPage() {
                   resendAt={step.resendAt}
                   onResent={(resendAt) => setStep({ ...step, resendAt })}
                   onBack={() => setStep({ kind: 'email' })}
+                  onBirthdayRequired={(ticket) => setStep({ kind: 'birthday', email: step.email, ticket })}
                   onVerified={async (tokens) => {
                     const result = await completeSignIn(tokens, step.email);
                     if (result === 'signedIn') await navigate({ to: redirect ?? '/', replace: true });
@@ -101,7 +121,7 @@ export function LoginPage() {
       {env.useMocks && (
         <Alert className="max-w-sm">
           <InfoIcon />
-          <AlertTitle>Mock API</AlertTitle>
+          <AlertTitle>Demo sign-in (mock API)</AlertTitle>
           <AlertDescription>
             <p>
               Any email, code <span className="font-mono font-semibold">123456</span>. Use{' '}

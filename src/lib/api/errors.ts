@@ -22,7 +22,14 @@ export class ApiError extends Error {
 
   constructor(
     kind: ApiErrorKind,
-    init: { status?: number | null; body?: ApiErrorBody | null; message?: string; requestId?: string | null } = {},
+    init: {
+      status?: number | null;
+      body?: ApiErrorBody | null;
+      message?: string;
+      requestId?: string | null;
+      /** `Retry-After` in seconds, used when the body has no `retryAt`. */
+      retryAfterSeconds?: number | null;
+    } = {},
   ) {
     const body = init.body ?? null;
     const fromBody = Array.isArray(body?.message) ? body.message.join(', ') : body?.message;
@@ -32,7 +39,11 @@ export class ApiError extends Error {
     this.status = init.status ?? body?.statusCode ?? null;
     this.code = body?.code ?? null;
     this.requestId = body?.requestId ?? init.requestId ?? null;
-    this.retryAt = body?.retryAt ?? null;
+    this.retryAt =
+      body?.retryAt ??
+      (init.retryAfterSeconds != null && Number.isFinite(init.retryAfterSeconds)
+        ? Date.now() + init.retryAfterSeconds * 1000
+        : null);
     this.details = body?.details ?? null;
   }
 
@@ -73,11 +84,45 @@ const CODE_COPY: Record<string, string> = {
   CONTENT_EXISTS: 'An item with this id already exists.',
   NOT_IN_REVIEW: 'This item is not in review any more.',
   INVALID_CONTENT: 'The content did not pass validation.',
+  CONTENT_CONFLICT: 'Someone else changed this item since you opened it.',
+  HELD_CONTENT: 'This draft matches content the workbook holds back. Confirm you checked it.',
+  NOT_PUBLISHED: 'This item was never approved, so it is not in the app.',
   PROVIDER_NOT_CONFIGURED: 'That provider has no API key on the server.',
+  SETTINGS_CONFLICT: 'Someone else saved the AI settings since you opened them. Reload, then make your change again.',
   FORBIDDEN: 'Your role cannot do this.',
+  INSUFFICIENT_ROLE: 'Not available for your role.',
+  USER_NOT_FOUND: 'This account no longer exists. It may have been deleted.',
+  INVALID_REASON: 'Give a reason of 1 to 300 characters.',
+  INVALID_TAGS: 'Tags: at most 20, each 1 to 32 characters of a-z, 0-9 and -.',
+  INVALID_DAYS: 'Grant 1 to 365 days.',
+  INVALID_NOTE: 'The note is too long.',
+  TICKET_NOT_FOUND: 'This ticket no longer exists. It may have been deleted with the account.',
+  SCREENSHOT_NOT_FOUND: 'This ticket has no screenshot.',
+  FLAG_NOT_FOUND: 'This safety flag no longer exists. It may have expired or been deleted with the account.',
+  REFRESH_REUSED: 'Your session ended. Sign in again.',
+  CATALOG_ITEM_EXISTS: 'An idea with this id exists already. Retired ideas keep their id.',
+  CATALOG_ITEM_NOT_FOUND: 'This idea no longer exists. It may have been retired.',
+  EXPERIENCE_EXISTS: 'An experience with this id exists already. Retired ones keep their id.',
+  EXPERIENCE_NOT_FOUND: 'This experience no longer exists. It may have been retired.',
+  BOOKING_LINK_NOT_FOUND: 'This card has no venue page to remove.',
+  WEBHOOK_URL_INVALID: 'The server refused this webhook URL.',
 };
 
+/** "Too many requests" with how long to wait, from `retryAt` (body) or `Retry-After` (header). */
+function rateLimitMessage(e: ApiError, now = Date.now()): string {
+  const at = typeof e.retryAt === 'number' ? e.retryAt : e.retryAt ? Date.parse(e.retryAt) : NaN;
+  const seconds = Number.isFinite(at) ? Math.max(1, Math.ceil((at - now) / 1000)) : null;
+  return seconds ? `Too many requests. Try again in ${seconds} s.` : 'Too many requests. Wait a moment and try again.';
+}
+
+/** 403 for the role (not a suspension): the server says INSUFFICIENT_ROLE. */
+export function isRoleRefusal(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 403 && (e.code === 'INSUFFICIENT_ROLE' || e.code === 'FORBIDDEN');
+}
+
 export function errorMessage(e: unknown): string {
+  if (e instanceof ApiError && (e.code === 'RATE_LIMITED' || e.status === 429)) return rateLimitMessage(e);
+  if (e instanceof ApiError && e.code === 'WEBHOOK_URL_INVALID') return `${CODE_COPY.WEBHOOK_URL_INVALID} ${e.message}`;
   if (e instanceof ApiError) return (e.code && CODE_COPY[e.code]) || e.message;
   if (e instanceof Error) return e.message;
   return 'Something went wrong.';

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { ContentItem } from '../api/types';
 import { workflowStatus, type ActionState, type Workflow } from '../lib/workflow';
+import { ApproveDialog } from './approve-dialog';
 
 const optionalNote = z.object({ note: z.string().trim().max(2000) });
 const requiredNote = z.object({ note: z.string().trim().min(1, 'Say what needs to change.').max(2000) });
@@ -22,13 +23,15 @@ type Dialog = null | 'submit' | 'approve' | 'changes' | 'discard' | 'unpublish' 
 
 export interface WorkflowBarProps {
   item: ContentItem;
+  /** The signed-in staff id (self-approval warning). */
+  userId?: string | null;
   workflow: Workflow;
   dirty: boolean;
   onSave: () => void;
   onResetLocal: () => void;
   onDiscard: () => Promise<unknown>;
   onSubmit: (note?: string) => Promise<unknown>;
-  onApprove: (note?: string) => Promise<unknown>;
+  onApprove: (v: { note?: string; acknowledgeHeld: boolean }) => Promise<unknown>;
   onRequestChanges: (note: string) => Promise<unknown>;
   onUnpublish: () => Promise<unknown>;
   onRestore: () => Promise<unknown>;
@@ -57,6 +60,7 @@ function Action({ state, children, ...props }: { state: ActionState } & React.Co
 /** Save, discard, submit, approve, request changes, unpublish and restore, by role and state. */
 export function WorkflowBar({
   item,
+  userId,
   workflow: wf,
   dirty,
   onSave,
@@ -140,18 +144,7 @@ export function WorkflowBar({
           />
         )}
       </FormDialog>
-      <FormDialog
-        open={dialog === 'approve'}
-        onOpenChange={close}
-        title="Approve and publish"
-        description={`The draft goes live as version ${item.liveVersion + 1}${item.retired ? ', but stays hidden while the item is unpublished' : ''}. The app picks it up on its next content check.`}
-        schema={optionalNote}
-        defaultValues={{ note: '' }}
-        submitLabel="Approve and publish"
-        onSubmit={(v) => onApprove(v.note || undefined)}
-      >
-        {(f) => <FormFieldTextarea control={f.control} name="note" label="Note (optional)" rows={3} maxLength={2000} />}
-      </FormDialog>
+      <ApproveDialog item={item} userId={userId} open={dialog === 'approve'} onOpenChange={close} onApprove={onApprove} />
       <FormDialog
         open={dialog === 'changes'}
         onOpenChange={close}

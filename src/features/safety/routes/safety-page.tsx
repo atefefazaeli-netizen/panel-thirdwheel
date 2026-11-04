@@ -29,7 +29,7 @@ export function SafetyPage() {
   const navigate = route.useNavigate();
   const page = search.page ?? 1;
   const limit = search.limit ?? 20;
-  const { surface, flag: openFlag, ...apiQuery } = search;
+  const { flag: openFlag, ...apiQuery } = search;
   const list = useSafetyFlags({ ...apiQuery, page, limit });
   const summary = useSafetySummary();
   const selected = useSafetyFlag(openFlag ?? null);
@@ -65,14 +65,13 @@ export function SafetyPage() {
     },
     {
       id: 'surface',
-      title: 'Where (this page)',
+      title: 'Where',
       value: one('surface'),
-      onChange: (v) => set({ surface: v[0] as SafetySearch['surface'] }, false),
+      onChange: (v) => set({ surface: v[0] as SafetySearch['surface'] }),
       options: SURFACES.map((s) => ({ value: s, label: SURFACE_LABEL[s] })),
     },
   ];
-  // The API has no surface filter: narrow the loaded page only.
-  const rows = list.data?.items.filter((f) => !surface || f.surface === surface);
+  const rows = list.data?.items;
   const s = summary.data;
 
   return (

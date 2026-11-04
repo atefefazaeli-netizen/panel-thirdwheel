@@ -17,7 +17,7 @@ export const catalogSearchSchema = z.object({
 export const experienceSearchSchema = z.object({ exp: optionalEnum(EXP_KEYS), ...pageSearch });
 
 export const catalogItemSchema = z.object({
-  id: z.number({ error: 'A number.' }).int().min(1, 'From 1.').max(1_000_000),
+  id: z.number({ error: 'A number.' }).int().min(1, 'From 1.').max(1_000_000).nullable(),
   title: z.string().trim().min(1, 'Title is required.').max(120),
   where: z.enum(['home', 'out']),
   usd: z.number({ error: 'Price in whole USD.' }).int('Whole dollars.').min(0),

@@ -31,15 +31,16 @@ VITE_API_URL=/api/v1 npm run dev                    # same origin through the de
 VITE_API_URL=/api/v1 VITE_API_PROXY_TARGET=http://localhost:4000 npm run dev
 ```
 
-For a deployed panel, build with the API's full URL: `VITE_API_URL=https://api.thirdwheel.app/api/v1 npm run build`.
+For a deployed panel, build with the API's full URL: `VITE_API_URL=https://api.thirdwheel.app/api/v1 npm run build`. Add the panel's origin to the API's `CORS_ORIGINS`. That build has no mock code, no `mockServiceWorker.js` and no source maps. Every `VITE_` value ends up in the public bundle, so never put a secret in one.
 
 ## Environment variables
 
-| Variable                | Default                 | What it does                                                                          |
-| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
-| `VITE_API_URL`          | empty (= `/api/v1`)     | Base URL of the API including `/api/v1`. Empty in development turns the mock API on.  |
-| `VITE_API_PROXY_TARGET` | `http://localhost:3000` | Where `npm run dev` proxies `/api` (no CORS needed in development).                   |
-| `VITE_API_MOCKS`        | empty                   | `1` always uses the mock API (also in a production build, for demos). `0` never does. |
+| Variable                | Default                 | What it does                                                                                                                                                                                              |
+| ----------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_URL`          | empty (= `/api/v1`)     | Base URL of the API including `/api/v1`. Empty in development turns the mock API on.                                                                                                                      |
+| `VITE_API_PROXY_TARGET` | `http://localhost:3000` | Where `npm run dev` proxies `/api` (no CORS needed in development).                                                                                                                                       |
+| `VITE_API_MOCKS`        | empty                   | `1` always uses the mock API (also in a production build, for demos: every screen then shows a permanent "Demo data, not the real API" banner and the tab title starts with [DEMO DATA]). `0` never does. |
+| `VITE_SOURCEMAP`        | empty                   | `1` writes hidden source maps (no `sourceMappingURL`) for an error tracker. Do not deploy the `.map` files.                                                                                               |
 
 Copy `.env.example` to `.env.local` to set them.
 

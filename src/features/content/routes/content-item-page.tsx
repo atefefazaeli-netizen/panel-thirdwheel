@@ -1,7 +1,8 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
 import * as React from 'react';
-import { useFormState } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFormState, type FieldPath } from 'react-hook-form';
 import { toast } from 'sonner';
 import { ConfirmDialog, ErrorState, PageHeader } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,13 +12,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useRoles } from '@/stores/session';
+import { contentApi } from '../api/content-api';
 import {
+  contentKeys,
   useApproveContent,
   useContentFacets,
   useContentItem,
   useDiscardDraft,
   useRequestChanges,
   useRestoreContent,
+  useRollbackContent,
   useSaveDraft,
   useSubmitContent,
   useUnpublishContent,
@@ -25,17 +29,20 @@ import {
 import type { ContentItem } from '../api/types';
 import { CardsTab } from '../components/cards-tab';
 import { CatalogTab } from '../components/catalog-tab';
+import { ConflictBanner } from '../components/conflict-banner';
 import { ContentStateBadge } from '../components/content-state-badge';
 import { DeckTab } from '../components/deck-tab';
 import { HistoryTab } from '../components/history-tab';
 import { PreviewPanel } from '../components/preview-panel';
+import { HeldBadge, HeldBanner, NeedsReviewBadge, ProvenancePanel } from '../components/review-status';
 import { StepsTab } from '../components/steps-tab';
 import { WorkflowBar } from '../components/workflow-bar';
 import { editableSnapshot, useContentEditor } from '../hooks/use-content-editor';
 import { useUnsavedGuard } from '../hooks/use-unsaved-guard';
 import { contentState, KIND_LABEL, PILLAR_LABEL, playsField } from '../lib/labels';
+import { detailsToFieldErrors, isConflict } from '../lib/review';
 import { workflowFor } from '../lib/workflow';
-import { formToSnapshot, snapshotBytes, snapshotToForm, LIMITS } from '../schemas/editor';
+import { formToSnapshot, snapshotBytes, LIMITS, type EditorValues } from '../schemas/editor';
 
 const route = getRouteApi('/_app/content/$id');
 
@@ -64,11 +71,13 @@ function serverProblems(e: unknown): string[] | null {
 function Editor({ item }: { item: ContentItem }) {
   const { tab = 'catalog' } = route.useSearch();
   const navigate = route.useNavigate();
+  const qc = useQueryClient();
   const { isAdmin, user } = useRoles();
   const facets = useContentFacets();
-  const form = useContentEditor(item);
+  const { form, baseRev, stale, markConflict, resetTo, setWriting } = useContentEditor(item);
   const { isDirty, isValid } = useFormState({ control: form.control });
   const [problems, setProblems] = React.useState<string[] | null>(null);
+  const [reloading, setReloading] = React.useState(false);
 
   const save = useSaveDraft(item.id);
   const discard = useDiscardDraft(item.id);
@@ -77,10 +86,11 @@ function Editor({ item }: { item: ContentItem }) {
   const changes = useRequestChanges(item.id);
   const unpublish = useUnpublishContent(item.id);
   const restore = useRestoreContent(item.id);
-  const busy = [save, discard, submit, approve, changes, unpublish, restore].some((m) => m.isPending);
+  const rollback = useRollbackContent(item.id);
+  const busy = [save, discard, submit, approve, changes, unpublish, restore, rollback].some((m) => m.isPending);
 
   const readOnly = !isAdmin;
-  const wf = workflowFor(item, user?.roles ?? [], { dirty: isDirty, valid: isValid, busy });
+  const wf = workflowFor(item, user?.roles ?? [], { dirty: isDirty, valid: isValid, busy, stale });
   const blocker = useUnsavedGuard(isDirty && !readOnly);
   const plays = playsField(item.kind);
   const title = (editableSnapshot(item).catalog.title as string) || item.id;
@@ -91,6 +101,42 @@ function Editor({ item }: { item: ContentItem }) {
     ]),
   ];
 
+  /**
+   * Runs one write with the revision this screen is based on. A 409 CONTENT_CONFLICT keeps every
+   * local edit and shows the conflict banner (the dialog closes); other errors toast and keep the
+   * dialog open.
+   */
+  const act = async (fn: (rev: number) => Promise<ContentItem>, done?: string) => {
+    setWriting(true);
+    try {
+      const saved = await fn(baseRev);
+      resetTo(saved);
+      if (done) toast.success(done);
+    } catch (e) {
+      if (isConflict(e)) {
+        markConflict();
+        return;
+      }
+      toast.error(errorMessage(e));
+      throw e;
+    } finally {
+      setWriting(false);
+    }
+  };
+
+  const reload = async () => {
+    setReloading(true);
+    try {
+      const fresh = await qc.fetchQuery({ queryKey: contentKeys.item(item.id), queryFn: () => contentApi.get(item.id), staleTime: 0 });
+      resetTo(fresh);
+      setProblems(null);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setReloading(false);
+    }
+  };
+
   const onSave = form.handleSubmit(
     async (values) => {
       const snapshot = formToSnapshot(values);
@@ -98,21 +144,22 @@ function Editor({ item }: { item: ContentItem }) {
         setProblems(['snapshot: at most 256 KB']);
         return;
       }
+      setProblems(null);
       try {
-        setProblems(null);
-        const saved = await save.mutateAsync(snapshot);
-        form.reset(snapshotToForm(editableSnapshot(saved)));
-        toast.success('Draft saved');
+        await act((rev) => save.mutateAsync({ snapshot, rev }), 'Draft saved');
       } catch (e) {
         const details = serverProblems(e);
-        if (details) setProblems(details);
-        else if (e instanceof ApiError && e.code === 'CONTENT_CONFLICT')
-          toast.error('Someone else changed this item first. Reload to see their changes.');
-        else toast.error(errorMessage(e));
+        if (!details) return;
+        // Field-level: mark each field the server named; list everything above the tabs.
+        const { mapped } = detailsToFieldErrors(details);
+        for (const m of mapped) form.setError(m.path as FieldPath<EditorValues>, { type: 'server', message: m.message });
+        setProblems(details);
       }
     },
     () => toast.error('Some fields need attention before saving.'),
   );
+
+  const localJson = isDirty ? JSON.stringify(formToSnapshot(form.getValues()), null, 2) : null;
 
   return (
     <Form {...form}>
@@ -121,6 +168,8 @@ function Editor({ item }: { item: ContentItem }) {
         meta={
           <>
             <ContentStateBadge state={contentState(item)} version={item.liveVersion} />
+            {item.needsReview && <NeedsReviewBadge />}
+            {item.heldMatch && <HeldBadge />}
             {item.draft?.source === 'n8n' && <Badge variant="outline">From n8n</Badge>}
           </>
         }
@@ -133,17 +182,21 @@ function Editor({ item }: { item: ContentItem }) {
       />
       <WorkflowBar
         item={item}
+        userId={user?.userId}
         workflow={wf}
         dirty={isDirty}
         onSave={() => void onSave()}
-        onResetLocal={() => form.reset(snapshotToForm(editableSnapshot(item)))}
-        onDiscard={() => discard.mutateAsync(undefined)}
-        onSubmit={(note) => submit.mutateAsync(note)}
-        onApprove={(note) => approve.mutateAsync(note)}
-        onRequestChanges={(note) => changes.mutateAsync(note)}
-        onUnpublish={() => unpublish.mutateAsync(undefined)}
-        onRestore={() => restore.mutateAsync(undefined)}
+        onResetLocal={() => resetTo(item)}
+        onDiscard={() => act((rev) => discard.mutateAsync({ rev }), 'Draft discarded')}
+        onSubmit={(note) => act((rev) => submit.mutateAsync({ rev, note }), 'Sent for review')}
+        onApprove={(v) => act((rev) => approve.mutateAsync({ rev, ...v }), 'Approved and published')}
+        onRequestChanges={(note) => act((rev) => changes.mutateAsync({ rev, note }), 'Sent back with your note')}
+        onUnpublish={() => act((rev) => unpublish.mutateAsync({ rev }), 'Unpublished')}
+        onRestore={() => act((rev) => restore.mutateAsync({ rev }), 'Restored')}
       />
+      {stale && <ConflictBanner localJson={localJson} onReload={() => void reload()} reloading={reloading} />}
+      {item.heldMatch && <HeldBanner match={item.heldMatch} />}
+      <ProvenancePanel item={item} />
       {readOnly && (
         <Alert>
           <InfoIcon />
@@ -201,7 +254,13 @@ function Editor({ item }: { item: ContentItem }) {
               </fieldset>
             </TabsContent>
             <TabsContent value="history" className="mt-2">
-              <HistoryTab item={item} />
+              <HistoryTab
+                item={item}
+                dirty={isDirty}
+                onRollback={(version, note) =>
+                  act((rev) => rollback.mutateAsync({ version, rev, note }), `Version ${version} is live again`)
+                }
+              />
             </TabsContent>
           </Tabs>
         </div>

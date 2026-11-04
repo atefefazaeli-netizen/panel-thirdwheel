@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { db } from '@/mocks/db';
 import { server } from '@/mocks/node';
 import { p } from '@/mocks/utils';
-import { api, apiUrl, onSessionEnd, refreshSession } from './client';
-import { ApiError, errorMessage, shouldRetry } from './errors';
+import { api, apiUrl, onRoleRefused, onSessionEnd, refreshSession } from './client';
+import { ApiError, errorMessage, isRoleRefusal, shouldRetry } from './errors';
 import { getAccessToken, getRefreshToken, setTokens } from './tokens';
 
 /** Signs in through the mock auth routes and returns the issued tokens. */
@@ -48,6 +48,28 @@ describe('error mapping', () => {
     expect(e.requestId).toBe('req-1');
     expect(e.isClientError).toBe(true);
     expect(errorMessage(e)).toBe('An item with this id already exists.');
+  });
+
+  it('429: says how long to wait, from retryAt or else from the Retry-After header', async () => {
+    const soon = new Date(Date.now() + 42_000).toISOString();
+    server.use(
+      http.get(p('limited-body'), () =>
+        HttpResponse.json({ statusCode: 429, message: 'x', code: 'RATE_LIMITED', retryAt: soon }, { status: 429 }),
+      ),
+      http.get(p('limited-header'), () =>
+        HttpResponse.json(
+          { statusCode: 429, message: 'ThrottlerException: Too Many Requests' },
+          { status: 429, headers: { 'Retry-After': '30' } },
+        ),
+      ),
+      http.get(p('limited-bare'), () => HttpResponse.json({ statusCode: 429, message: 'x' }, { status: 429 })),
+    );
+    const a = (await api.get('limited-body', { auth: false }).catch((e: unknown) => e)) as ApiError;
+    expect(errorMessage(a)).toMatch(/^Too many requests\. Try again in 4[12] s\.$/);
+    const b = (await api.get('limited-header', { auth: false }).catch((e: unknown) => e)) as ApiError;
+    expect(errorMessage(b)).toMatch(/^Too many requests\. Try again in (29|30) s\.$/);
+    const c = (await api.get('limited-bare', { auth: false }).catch((e: unknown) => e)) as ApiError;
+    expect(errorMessage(c)).toBe('Too many requests. Wait a moment and try again.');
   });
 
   it('joins validation message arrays', async () => {
@@ -185,5 +207,63 @@ describe('refresh flow', () => {
     await expect(api.get('admin/stats')).rejects.toMatchObject({ code: 'ACCOUNT_SUSPENDED' });
     off();
     expect(ended).toHaveBeenCalledWith('suspended');
+  });
+});
+
+describe('role refusals (403 INSUFFICIENT_ROLE)', () => {
+  it('notify role listeners without ending the session; a suspension does not count', async () => {
+    await signIn();
+    const refused = vi.fn();
+    const ended = vi.fn();
+    const offRole = onRoleRefused(refused);
+    const offEnd = onSessionEnd(ended);
+    server.use(
+      http.get(p('role'), () =>
+        HttpResponse.json(
+          { statusCode: 403, message: 'Insufficient role', code: 'INSUFFICIENT_ROLE' },
+          { status: 403 },
+        ),
+      ),
+      http.get(p('suspended'), () =>
+        HttpResponse.json({ statusCode: 403, message: 'Suspended', code: 'ACCOUNT_SUSPENDED' }, { status: 403 }),
+      ),
+    );
+    const e = await api.get('role').catch((x: unknown) => x);
+    expect(isRoleRefusal(e)).toBe(true);
+    expect(errorMessage(e)).toBe('Not available for your role.');
+    expect(refused).toHaveBeenCalledTimes(1);
+    expect(ended).not.toHaveBeenCalled();
+    expect(getRefreshToken()).not.toBeNull();
+    await signIn();
+    const s = await api.get('suspended').catch((x: unknown) => x);
+    expect(isRoleRefusal(s)).toBe(false);
+    expect(refused).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledWith('suspended');
+    offRole();
+    offEnd();
+  });
+
+  it('every admin error code the API sends has clear copy', () => {
+    const copy = (code: string) =>
+      errorMessage(new ApiError('http', { status: 400, body: { message: 'server text', code } }));
+    for (const code of [
+      'CONFIRM_MISMATCH',
+      'STAFF_ACCOUNT',
+      'SELF_ACTION',
+      'USER_NOT_FOUND',
+      'INVALID_REASON',
+      'INVALID_TAGS',
+      'INVALID_DAYS',
+      'INVALID_NOTE',
+      'TICKET_NOT_FOUND',
+      'SCREENSHOT_NOT_FOUND',
+      'FLAG_NOT_FOUND',
+      'ACCOUNT_SUSPENDED',
+      'INSUFFICIENT_ROLE',
+    ]) {
+      expect(copy(code)).not.toBe('server text');
+    }
+    expect(copy('STAFF_ACCOUNT')).toBe('Staff accounts cannot be deleted here.');
+    expect(copy('CONFIRM_MISMATCH')).toBe('The email you typed does not match this account.');
   });
 });

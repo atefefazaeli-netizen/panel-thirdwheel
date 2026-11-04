@@ -46,7 +46,6 @@ function Catalog() {
       search: (prev) => cleanSearch({ ...prev, ...(resetPage ? { page: undefined } : {}), ...patch }),
       replace: true,
     });
-  const nextId = Math.max(0, ...(list.data?.items.map((i) => i.id) ?? [0])) + 1;
 
   const h = columnHelper<CatalogItem>();
   const columns = h.columns([
@@ -185,7 +184,6 @@ function Catalog() {
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         item={editing === 'new' ? null : editing}
-        nextId={nextId}
       />
       <ConfirmDialog
         open={!!retiring}

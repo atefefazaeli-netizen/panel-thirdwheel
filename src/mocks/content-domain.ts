@@ -6,11 +6,23 @@ import type {
   ContentChange,
   ContentItem,
   ContentPillar,
+  ContentProvenance,
   ContentSnapshot,
   ContentVersionDetail,
   DraftSource,
   DraftState,
+  HeldEntry,
+  HeldMatch,
 } from '@/features/content/api/types';
+import provenanceData from './data/content-provenance.json';
+
+/** The backend's content.provenance.ts (seed provenance and the held list), as JSON for the mock. */
+export const SEED_PROVENANCE = provenanceData.provenance as unknown as Record<
+  string,
+  { source: 'release1-bundle'; cleared: string[]; needsReview: { part: string; reason: string }[]; notes: string[] }
+>;
+export const HELD_CONTENT = provenanceData.held as HeldEntry[];
+export const SEEDED_LABEL = 'Seeded from the Release 1 bundle, not a sign-off in this system';
 
 export const CONTENT_KINDS = [
   'quiz-turn',
@@ -47,13 +59,72 @@ export interface Actor {
   roles: readonly string[];
 }
 
-/** Stored item: the API view plus the optimistic-concurrency fields the server keeps. */
-export interface StoredItem extends ContentItem {
+/** Stored item: the API view without its computed fields, plus the server-only revision. */
+export interface StoredItem extends Omit<
+  ContentItem,
+  'liveSeeded' | 'liveApprovalLabel' | 'needsReview' | 'heldMatch'
+> {
   liveRevision: number;
 }
 
-export interface StoredVersion extends ContentVersionDetail {
+export interface StoredVersion extends Omit<ContentVersionDetail, 'seeded' | 'approvalLabel'> {
   itemId: string;
+}
+
+/* ---------- Provenance and held content (backend domain/provenance.ts) ---------- */
+
+export function provenanceFromSeed(id: string): ContentProvenance | null {
+  const p = SEED_PROVENANCE[id];
+  if (!p) return null;
+  return {
+    source: p.source,
+    cleared: [...p.cleared],
+    flagged: p.needsReview.map((n) => ({ ...n })),
+    needsReview: p.needsReview.map((n) => ({ ...n })),
+    notes: [...p.notes],
+    clearedBy: null,
+  };
+}
+
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export function heldMatchOf(catalog: Record<string, unknown> | null | undefined): HeldMatch | null {
+  if (!catalog) return null;
+  const reasons: HeldMatch['reasons'] = [];
+  const title = typeof catalog.title === 'string' ? norm(catalog.title) : '';
+  for (const h of HELD_CONTENT) {
+    const whole = /^all\b/i.test(h.item.trim());
+    if (!whole && title && ` ${title} `.includes(` ${norm(h.item)} `))
+      reasons.push({ field: 'title', value: String(catalog.title), held: h });
+    if (whole)
+      for (const field of ['category', 'world', 'sub'] as const) {
+        const v = catalog[field];
+        const keys = [
+          norm(h.world),
+          norm(h.world)
+            .replace(/\bthe\b /g, '')
+            .trim(),
+        ];
+        if (typeof v === 'string' && v && keys.includes(norm(v))) reasons.push({ field, value: v, held: h });
+      }
+  }
+  return reasons.length ? { reasons } : null;
+}
+
+/** Client-controlled concurrency: 409 CONTENT_CONFLICT when the item moved since `expected`. */
+export function checkRev(item: StoredItem, expected: unknown): void {
+  if (typeof expected !== 'number' || !Number.isInteger(expected) || expected < 0)
+    fail('VALIDATION_FAILED', 'expectedRev must be an integer not less than 0', 400);
+  if (item.rev !== expected)
+    fail('CONTENT_CONFLICT', 'Someone else changed this item. Reload and try again.', 409, [
+      `rev: you had ${String(expected)}, the item is at ${item.rev}`,
+    ]);
 }
 
 export interface StoredChange extends ContentChange {
@@ -265,6 +336,8 @@ export function createItem(
     liveRevision: 0,
     draft: null,
     retired: false,
+    rev: 0,
+    provenance: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -315,12 +388,32 @@ export function submitDraft(item: StoredItem, note: string | null | undefined, a
   };
 }
 
-export function approveDraft(item: StoredItem, note: string | null | undefined, actor: Actor, now: string): Transition {
+export function approveDraft(
+  item: StoredItem,
+  note: string | null | undefined,
+  actor: Actor,
+  now: string,
+  acknowledgeHeld = false,
+): Transition {
   if (!isClinician(actor)) fail('CLINICIAN_ONLY', 'Only a clinician can approve content.', 403);
   const d = item.draft;
   if (!d || d.state !== 'in_review') return fail('NOT_IN_REVIEW', 'Only a draft in review can be approved.', 409);
+  const held = heldMatchOf(d.snapshot.catalog);
+  if (held && !acknowledgeHeld)
+    fail(
+      'HELD_CONTENT',
+      'This draft matches content the workbook holds back. Confirm you have checked it.',
+      409,
+      held.reasons.map((r) => `catalog.${r.field}: matches held ${r.held.type} "${r.held.item}" (${r.held.why})`),
+    );
   const version = item.liveVersion + 1;
   const n = cleanNote(note);
+  const p = item.provenance;
+  const cleared = p?.needsReview.map((x) => x.part) ?? [];
+  const meta: NonNullable<ContentChange['meta']> = { version, summary: diffSummary(item.live, d.snapshot) };
+  if (d.by === actor.id) meta.selfApproved = true;
+  if (held) meta.acknowledgedHeld = true;
+  if (cleared.length) meta.clearedReview = cleared;
   return {
     item: touch(item, now, {
       live: d.snapshot,
@@ -329,8 +422,16 @@ export function approveDraft(item: StoredItem, note: string | null | undefined, 
       liveApprovedBy: actor.id,
       liveApprovedByEmail: actor.email,
       draft: null,
+      provenance:
+        p && cleared.length
+          ? {
+              ...p,
+              needsReview: [],
+              clearedBy: { by: actor.id, byEmail: actor.email, at: now, version, via: 'approved' },
+            }
+          : p,
     }),
-    change: entry('approved', actor, now, n, { version, summary: diffSummary(item.live, d.snapshot) }),
+    change: entry('approved', actor, now, n, meta),
     version: {
       itemId: item.id,
       version,
@@ -366,6 +467,8 @@ export function requestChanges(
 
 export function unpublishItem(item: StoredItem, actor: Actor, now: string): Transition {
   if (item.retired) fail('ALREADY_RETIRED', 'This item is already unpublished.', 409);
+  if (!item.live || item.liveVersion < 1)
+    fail('NOT_PUBLISHED', 'This item was never approved, so it is not in the app. Discard the draft instead.', 409);
   return {
     item: touch(item, now, { retired: true }),
     change: entry('unpublished', actor, now, null, { version: item.liveVersion }),
@@ -375,6 +478,8 @@ export function unpublishItem(item: StoredItem, actor: Actor, now: string): Tran
 
 export function restoreItem(item: StoredItem, actor: Actor, now: string): Transition {
   if (!item.retired) fail('NOT_RETIRED', 'This item is not unpublished.', 409);
+  if (!item.live || item.liveVersion < 1)
+    fail('NOT_PUBLISHED', 'This item was never approved, so there is nothing to restore.', 409);
   return {
     item: touch(item, now, { retired: false }),
     change: entry('restored', actor, now, null, { version: item.liveVersion }),
@@ -393,6 +498,23 @@ export function rollbackTo(
   if (target.version === item.liveVersion) fail('ALREADY_LIVE', 'That version is live now.', 409);
   const version = item.liveVersion + 1;
   const n = cleanNote(note);
+  const meta: NonNullable<ContentChange['meta']> = {
+    version,
+    summary: item.live ? diffSummary(item.live, target.snapshot) : ['new'],
+  };
+  const p = item.provenance;
+  let provenance = p;
+  if (p && target.approvedBy === 'workbook') {
+    provenance = { ...p, needsReview: p.flagged.map((x) => ({ ...x })), clearedBy: null };
+    if (p.flagged.length && !p.needsReview.length) meta.restoredReview = p.flagged.map((x) => x.part);
+  } else if (p && p.needsReview.length) {
+    meta.clearedReview = p.needsReview.map((x) => x.part);
+    provenance = {
+      ...p,
+      needsReview: [],
+      clearedBy: { by: target.approvedBy, byEmail: target.approvedByEmail, at: now, version, via: 'rollback' },
+    };
+  }
   return {
     item: touch(item, now, {
       live: target.snapshot,
@@ -400,11 +522,9 @@ export function rollbackTo(
       livePublishedAt: now,
       liveApprovedBy: target.approvedBy,
       liveApprovedByEmail: target.approvedByEmail,
+      provenance,
     }),
-    change: entry('rolled_back', actor, now, n, {
-      version,
-      summary: item.live ? diffSummary(item.live, target.snapshot) : ['new'],
-    }),
+    change: entry('rolled_back', actor, now, n, meta),
     version: {
       ...target,
       version,

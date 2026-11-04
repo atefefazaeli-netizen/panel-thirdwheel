@@ -46,6 +46,15 @@ export interface AdminProfileView {
   onboarded: boolean;
 }
 
+/** Where the current Plus comes from (server: same precedence as the app's Plus state). */
+export type PlusSource = 'store' | 'admin_grant' | 'partner' | 'none';
+/**
+ * How the store purchase behind the Plus was checked: `mock` while the API runs the development
+ * receipt verifier (no App Store or Play check), `store` with a real adapter, null when no store
+ * purchase is involved.
+ */
+export type ReceiptVerification = 'mock' | 'store';
+
 export interface AdminSubscriptionView {
   userId: string;
   state: SubscriptionState;
@@ -53,6 +62,9 @@ export interface AdminSubscriptionView {
   renewsAt: string | null;
   grant: { until: string; by: string; note: string | null } | null;
   experiencesUsed: number | null;
+  /** Missing from an API older than the accounts audit (read as unknown). */
+  source?: PlusSource;
+  verification?: ReceiptVerification | null;
 }
 
 /** Each part other than `account` reads null when its owner fails or has no handler yet. */
@@ -67,7 +79,11 @@ export interface AdminUserDetail {
   subscription: AdminSubscriptionView | null;
   safety: { open: number; total: number; lastAt: string | null } | null;
   support: { total: number; open: number } | null;
+  /** Parts that are null because their owner failed (not because there is nothing). */
+  unavailable?: AdminUserPart[];
 }
+
+export type AdminUserPart = 'profile' | 'couple' | 'subscription' | 'safety' | 'support';
 
 export interface UserListQuery {
   q?: string;

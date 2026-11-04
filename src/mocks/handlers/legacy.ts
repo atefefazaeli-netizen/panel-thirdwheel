@@ -46,36 +46,54 @@ function itemProblems(b: Partial<CatalogItem>, partial: boolean): string | null 
   return null;
 }
 
+/** Active ideas matching the list filters, sorted by id (as the API). */
+function listItems(url: URL) {
+  const q = url.searchParams;
+  const max = q.get('maxUsd') ? Number(q.get('maxUsd')) : null;
+  const s = db().legacy;
+  return s.items
+    .filter(
+      (i) =>
+        !s.retired.has(i.id) &&
+        (!q.get('where') || i.where === q.get('where')) &&
+        (!q.get('kind') || i.kind === q.get('kind')) &&
+        (max === null || i.usd <= max),
+    )
+    .sort((a, b) => a.id - b.id);
+}
+
 export const legacyHandlers = [
   http.get(p('catalog/items'), ({ request }) => {
     const url = new URL(request.url);
-    const q = url.searchParams;
-    const max = q.get('maxUsd') ? Number(q.get('maxUsd')) : null;
-    const s = db().legacy;
-    const rows = s.items
-      .filter(
-        (i) =>
-          !s.retired.has(i.id) &&
-          (!q.get('where') || i.where === q.get('where')) &&
-          (!q.get('kind') || i.kind === q.get('kind')) &&
-          (max === null || i.usd <= max),
-      )
-      .map(publicItem);
-    return HttpResponse.json(paginate(rows, url));
+    return HttpResponse.json(paginate(listItems(url).map(publicItem), url));
   }),
+
+  // Admin list: tags and refPrefix included.
+  http.get(p('catalog/admin/items'), ({ request }) =>
+    guard(request, 'admin', () => {
+      const url = new URL(request.url);
+      return HttpResponse.json(paginate(listItems(url), url));
+    }),
+  ),
 
   http.post(p('catalog/items'), ({ request }) =>
     guard(request, 'admin', async (me) => {
       const b = await readJson<Partial<CatalogItem>>(request);
-      if (!Number.isInteger(b.id) || (b.id as number) < 1 || (b.id as number) > 1_000_000)
-        return badRequest('id must be an integer from 1');
+      if (b.id !== undefined && (!Number.isInteger(b.id) || b.id < 1 || b.id > 1_000_000))
+        return badRequest('id must not be less than 1');
       const bad = itemProblems(b, false);
       if (bad) return badRequest(bad);
-      if (db().legacy.items.some((i) => i.id === b.id))
-        return apiError(409, `Idea ${b.id} exists already`, 'ITEM_EXISTS');
-      const item = { tags: [], refPrefix: 'TW', ...b } as CatalogItem;
+      // Without an id: the next one after every id ever used (retired ideas keep theirs).
+      const id = b.id ?? Math.max(0, ...db().legacy.items.map((i) => i.id)) + 1;
+      if (db().legacy.items.some((i) => i.id === id))
+        return apiError(
+          409,
+          'An idea with this id already exists (retired ideas keep their id)',
+          'CATALOG_ITEM_EXISTS',
+        );
+      const item = { tags: [], refPrefix: 'TW', ...b, id } as CatalogItem;
       db().legacy.items.push(item);
-      recordAudit(me, 'catalog.create', `catalog_item:${item.id}`);
+      recordAudit(me, 'catalog.item.create', `catalog_item:${item.id}`);
       return HttpResponse.json(item, { status: 201 });
     }),
   ),
@@ -83,12 +101,12 @@ export const legacyHandlers = [
   http.patch(p('catalog/items/:id'), ({ request, params }) =>
     guard(request, 'admin', async (me) => {
       const item = db().legacy.items.find((i) => i.id === Number(params.id) && !db().legacy.retired.has(i.id));
-      if (!item) return apiError(404, 'Idea not found', 'NOT_FOUND');
+      if (!item) return apiError(404, 'Idea not found', 'CATALOG_ITEM_NOT_FOUND');
       const { id: _ignored, ...patch } = await readJson<Partial<CatalogItem>>(request);
       const bad = itemProblems(patch, true);
       if (bad) return badRequest(bad);
       mergePatch(item, patch);
-      recordAudit(me, 'catalog.update', `catalog_item:${item.id}`);
+      recordAudit(me, 'catalog.item.update', `catalog_item:${item.id}`, { fields: Object.keys(patch).sort() });
       return HttpResponse.json(item);
     }),
   ),
@@ -96,9 +114,10 @@ export const legacyHandlers = [
   http.delete(p('catalog/items/:id'), ({ request, params }) =>
     guard(request, 'admin', (me) => {
       const id = Number(params.id);
-      if (!db().legacy.items.some((i) => i.id === id)) return apiError(404, 'Idea not found', 'NOT_FOUND');
+      if (!db().legacy.items.some((i) => i.id === id) || db().legacy.retired.has(id))
+        return apiError(404, 'Idea not found', 'CATALOG_ITEM_NOT_FOUND');
       db().legacy.retired.add(id);
-      recordAudit(me, 'catalog.retire', `catalog_item:${id}`);
+      recordAudit(me, 'catalog.item.retire', `catalog_item:${id}`);
       return new HttpResponse(null, { status: 204 });
     }),
   ),
@@ -136,20 +155,20 @@ export const legacyHandlers = [
   http.patch(p('experiences/:id'), ({ request, params }) =>
     guard(request, 'admin', async (me) => {
       const x = db().legacy.experiences.find((e) => e.id === params.id && !db().legacy.retiredXp.has(e.id));
-      if (!x) return apiError(404, 'Experience not found', 'NOT_FOUND');
+      if (!x) return apiError(404, 'Experience not found', 'EXPERIENCE_NOT_FOUND');
       const { id: _ignored, ...patch } = await readJson<Record<string, unknown>>(request);
       if (patch.exp !== undefined && !EXPS.includes(patch.exp as string))
         return badRequest('exp must be one of the following values: ' + EXPS.join(', '));
       mergePatch(x, patch);
-      recordAudit(me, 'experience.update', `experience:${x.id}`);
+      recordAudit(me, 'experience.update', `experience:${x.id}`, { fields: Object.keys(patch).sort() });
       return HttpResponse.json(x);
     }),
   ),
 
   http.delete(p('experiences/:id'), ({ request, params }) =>
     guard(request, 'admin', (me) => {
-      if (!db().legacy.experiences.some((x) => x.id === params.id))
-        return apiError(404, 'Experience not found', 'NOT_FOUND');
+      if (!db().legacy.experiences.some((x) => x.id === params.id) || db().legacy.retiredXp.has(String(params.id)))
+        return apiError(404, 'Experience not found', 'EXPERIENCE_NOT_FOUND');
       db().legacy.retiredXp.add(String(params.id));
       recordAudit(me, 'experience.retire', `experience:${String(params.id)}`);
       return new HttpResponse(null, { status: 204 });
@@ -188,15 +207,20 @@ export const legacyHandlers = [
       if (typeof b.paid !== 'boolean') return badRequest('paid must be a boolean value');
       const link = { url: b.url!, paidLink: b.paid, venue: b.venue ?? null, source: 'venue' as const };
       db().legacy.links.set(id, link);
-      recordAudit(me, 'booking_link.set', `card:${id}`);
+      recordAudit(me, 'booking_link.set', `booking_link:${id}`, {
+        host: new URL(b.url!).host,
+        paid: b.paid,
+        venue: b.venue ?? null,
+      });
       return HttpResponse.json(link);
     }),
   ),
 
   http.delete(p('ideas/:id/booking-link'), ({ request, params }) =>
     guard(request, 'admin', (me) => {
-      db().legacy.links.delete(String(params.id));
-      recordAudit(me, 'booking_link.remove', `card:${String(params.id)}`);
+      if (!db().legacy.links.delete(String(params.id)))
+        return apiError(404, 'No venue page for this card', 'BOOKING_LINK_NOT_FOUND');
+      recordAudit(me, 'booking_link.remove', `booking_link:${String(params.id)}`);
       return new HttpResponse(null, { status: 204 });
     }),
   ),

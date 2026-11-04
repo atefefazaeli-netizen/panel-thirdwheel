@@ -21,12 +21,14 @@ const off = (reason: string): ActionState => ({ visible: true, enabled: false, r
 export function workflowFor(
   item: Pick<ContentItem, 'draft' | 'retired' | 'liveVersion'>,
   roles: readonly string[],
-  opts: { dirty: boolean; valid?: boolean; busy?: boolean },
+  opts: { dirty: boolean; valid?: boolean; busy?: boolean; stale?: boolean },
 ): Workflow {
   const admin = roles.includes('admin');
   const clinician = roles.includes('clinician');
   const state = item.draft?.state ?? null;
   const busy = !!opts.busy;
+  // Someone else changed the item: every write waits until the latest is loaded.
+  const stale = !!opts.stale;
   const wf: Workflow = {
     save: hidden,
     discard: hidden,
@@ -38,7 +40,9 @@ export function workflowFor(
   };
 
   if (admin) {
-    wf.save = !opts.dirty
+    wf.save = stale
+      ? off('Changed by someone else: load the latest first')
+      : !opts.dirty
       ? off('No changes to save')
       : opts.valid === false
         ? off('Fix the errors first')
@@ -61,8 +65,14 @@ export function workflowFor(
   }
 
   if (clinician && state === 'in_review') {
-    wf.approve = opts.dirty ? off('Unsaved edits: save or discard them first') : busy ? off('Working') : on;
-    wf.requestChanges = busy ? off('Working') : on;
+    wf.approve = stale
+      ? off('Changed by someone else: load the latest and review it again')
+      : opts.dirty
+        ? off('Unsaved edits: save or discard them first')
+        : busy
+          ? off('Working')
+          : on;
+    wf.requestChanges = stale ? off('Changed by someone else: load the latest first') : busy ? off('Working') : on;
   }
   return wf;
 }

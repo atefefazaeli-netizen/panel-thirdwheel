@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2Icon, FileUpIcon, UploadIcon, XCircleIcon } from 'lucide-react';
+import { CheckCircle2Icon, FileUpIcon, SearchCheckIcon, ShieldAlertIcon, UploadIcon, XCircleIcon } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -10,10 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { errorMessage } from '@/lib/api';
 import { parseJson } from '@/lib/json';
-import { useImportContent } from '../api/queries';
-import type { ContentImportResult } from '../api/types';
-import { KIND_LABEL } from '../lib/labels';
+import { useImportCheck, useImportContent } from '../api/queries';
+import type { ContentImportItemResult, ContentImportResult } from '../api/types';
+import { KIND_LABEL, STATE_LABEL } from '../lib/labels';
 import { parseImport, type ImportRow } from '../schemas/import';
 
 const EXAMPLE = JSON.stringify(
@@ -55,6 +56,9 @@ function ImportScreen() {
   const [result, setResult] = React.useState<ContentImportResult | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const run = useImportContent();
+  const check = useImportCheck();
+  /** The server's dry run for the current text (validation, existing ids, held list); nothing written. */
+  const [checked, setChecked] = React.useState<{ text: string; byIndex: ContentImportItemResult[] } | null>(null);
   const form = useForm<z.infer<typeof noteSchema>>({ resolver: zodResolver(noteSchema), defaultValues: { note: '' } });
 
   const parsed = React.useMemo(() => {
@@ -64,6 +68,16 @@ function ImportScreen() {
   }, [text]);
   const rows: ImportRow[] = parsed?.ok ? parsed.rows : [];
   const valid = rows.filter((r) => r.item);
+  const server = checked && checked.text === text ? checked.byIndex : null;
+
+  const runCheck = async () => {
+    try {
+      const r = await check.mutateAsync(valid.map((v) => v.item!));
+      setChecked({ text, byIndex: r.results });
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
@@ -85,7 +99,7 @@ function ImportScreen() {
     <>
       <PageHeader
         title="Import content"
-        description="Paste or upload a JSON list of items (the same shape n8n sends). Every item lands as a draft in review, never live."
+        description="Paste or upload a JSON list of items (the same shape n8n sends). Every item lands as a draft in review, never live. The Release 1 workbook is an .xlsx: convert it with scripts/release1-workbook.py first; the panel does not read spreadsheets."
       />
       <div className="grid items-start gap-4 xl:grid-cols-2">
         <Card>
@@ -142,6 +156,7 @@ function ImportScreen() {
                       <TableHead>Title</TableHead>
                       <TableHead>Kind</TableHead>
                       <TableHead>Check</TableHead>
+                      <TableHead>Server</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -166,6 +181,9 @@ function ImportScreen() {
                             </ul>
                           )}
                         </TableCell>
+                        <TableCell className="whitespace-normal">
+                          <ServerCell result={r.item && server ? server[valid.indexOf(r)] : undefined} />
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -181,10 +199,25 @@ function ImportScreen() {
                   rows={2}
                   maxLength={500}
                 />
-                <Button type="submit" disabled={valid.length === 0 || run.isPending} className="self-start">
-                  <UploadIcon />
-                  {run.isPending ? 'Importing…' : `Import ${valid.length || ''} as drafts in review`}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={valid.length === 0 || check.isPending}
+                    onClick={() => void runCheck()}
+                  >
+                    <SearchCheckIcon />
+                    {check.isPending ? 'Checking…' : 'Check against the server'}
+                  </Button>
+                  <Button type="submit" disabled={valid.length === 0 || run.isPending}>
+                    <UploadIcon />
+                    {run.isPending ? 'Importing…' : `Import ${valid.length || ''} as drafts in review`}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  The check runs the import on the server without writing anything: it finds ids that already exist
+                  (their draft would be replaced), items the server rejects, and matches with held content.
+                </p>
               </form>
             </Form>
             {result && (
@@ -197,15 +230,14 @@ function ImportScreen() {
                     <StatusBadge status="pending" label={`${result.updated.length} updated`} />
                     <StatusBadge status="failed" label={`${result.rejected.length} rejected`} />
                   </div>
-                  {result.rejected.length > 0 && (
-                    <ul className="mt-2 list-disc pl-4">
-                      {result.rejected.map((r) => (
-                        <li key={r.id}>
-                          <span className="font-mono">{r.id || '(no id)'}</span>: {r.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <ul className="mt-2 flex flex-col gap-1" aria-label="Import results">
+                    {result.results.map((r, i) => (
+                      <li key={`${r.id}-${i}`} className="flex flex-wrap items-baseline gap-2">
+                        <span className="font-mono">{r.id || '(no id)'}</span>
+                        <ServerCell result={r} done />
+                      </li>
+                    ))}
+                  </ul>
                 </AlertDescription>
               </Alert>
             )}
@@ -213,5 +245,37 @@ function ImportScreen() {
         </Card>
       </div>
     </>
+  );
+}
+
+/** One item's server outcome: new, replaces a draft, rejected (with the server's details), held. */
+function ServerCell({ result, done }: { result: ContentImportItemResult | undefined; done?: boolean }) {
+  if (!result) return <span className="text-xs text-muted-foreground">Not checked</span>;
+  const held = result.held?.length ? (
+    <span className="flex items-start gap-1 text-xs text-destructive">
+      <ShieldAlertIcon className="mt-0.5 size-3 shrink-0" aria-hidden />
+      Held content: {result.held.join('; ')}
+    </span>
+  ) : null;
+  if (result.status === 'rejected')
+    return (
+      <span className="flex flex-col text-xs text-destructive">
+        <span>Rejected: {result.reason}</span>
+        {result.details?.map((d) => <span key={d}>{d}</span>)}
+      </span>
+    );
+  const what =
+    result.status === 'created'
+      ? done
+        ? 'Created, in review'
+        : 'New item'
+      : `${done ? 'Updated' : 'Exists'}: ${
+          result.replacedDraft ? `replaces its draft (${STATE_LABEL[result.replacedDraft]})` : 'becomes its draft in review'
+        }`;
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className={result.status === 'updated' ? 'text-xs text-warning' : 'text-xs text-success'}>{what}</span>
+      {held}
+    </span>
   );
 }

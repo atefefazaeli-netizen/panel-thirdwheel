@@ -2,6 +2,7 @@ export {
   api,
   apiUrl,
   endSession,
+  onRoleRefused,
   onSessionEnd,
   refreshSession,
   request,
@@ -9,6 +10,14 @@ export {
   type Method,
   type RequestOptions,
 } from './client';
-export { ApiError, errorMessage, isApiError, shouldRetry, type ApiErrorBody, type ApiErrorKind } from './errors';
+export {
+  ApiError,
+  errorMessage,
+  isApiError,
+  isRoleRefusal,
+  shouldRetry,
+  type ApiErrorBody,
+  type ApiErrorKind,
+} from './errors';
 export { clearTokens, getAccessToken, getRefreshToken, setTokens, type TokenPair } from './tokens';
 export { emptyPage, normalizePage, type PageMeta, type PageQuery, type Paginated, type Query } from './types';

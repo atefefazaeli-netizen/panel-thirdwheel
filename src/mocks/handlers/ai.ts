@@ -73,6 +73,14 @@ const sampleReply: Record<string, string> = {
   quiz: '{"headline":"You two plan alike","summary":"You both want weekends that start slow. Where you differ is how much you plan ahead.","insights":[...],"tryThis":"Pick one slow Saturday morning this month."}',
 };
 
+/** As the API: a save made on an older version than the newest is refused (no lost update). */
+const conflict = () =>
+  apiError(
+    409,
+    'Someone else saved the AI settings since you opened them. Reload to see their version, then make your change again.',
+    'SETTINGS_CONFLICT',
+  );
+
 export const aiHandlers = [
   http.get(p('admin/ai/settings'), ({ request }) =>
     guard(request, 'staff', () =>
@@ -94,9 +102,12 @@ export const aiHandlers = [
 
   http.put(p('admin/ai/settings'), ({ request }) =>
     guard(request, 'admin', async (me) => {
-      const body = await readJson<Partial<AiSettingsInput> & { note?: string }>(request);
+      const { baseVersion, ...body } = await readJson<
+        Partial<AiSettingsInput> & { note?: string; baseVersion?: number }
+      >(request);
       if (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 300))
         return badRequest('note must be shorter than or equal to 300 characters');
+      if (baseVersion !== undefined && baseVersion !== (latest()?.version ?? 0)) return conflict();
       try {
         const settings = normalize(body);
         const version = (latest()?.version ?? 0) + 1;
@@ -136,7 +147,8 @@ export const aiHandlers = [
 
   http.post(p('admin/ai/settings/rollback'), ({ request }) =>
     guard(request, 'admin', async (me) => {
-      const { version } = await readJson<{ version?: number }>(request);
+      const { version, baseVersion } = await readJson<{ version?: number; baseVersion?: number }>(request);
+      if (baseVersion !== undefined && baseVersion !== (latest()?.version ?? 0)) return conflict();
       const target = db().ai.versions.find((v) => v.version === version);
       if (!target) return apiError(404, 'No such version', 'VERSION_NOT_FOUND');
       try {

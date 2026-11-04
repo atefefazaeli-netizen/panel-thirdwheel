@@ -102,6 +102,33 @@ export interface ContentDraft {
   source: DraftSource;
 }
 
+/** One part no clinician has reviewed in this system ("steps", "deck", "cards.options"…). */
+export interface ReviewNeed {
+  part: string;
+  reason: string;
+}
+
+/** Seeded items: where the text comes from (ADMIN_API.md › Content › Provenance). */
+export interface ContentProvenance {
+  source: 'release1-bundle';
+  cleared: string[];
+  flagged: ReviewNeed[];
+  needsReview: ReviewNeed[];
+  notes: string[];
+  clearedBy: { by: string; byEmail: string | null; at: string; version: number; via: string } | null;
+}
+
+export interface HeldEntry {
+  type: string;
+  world: string;
+  item: string;
+  why: string;
+}
+
+export interface HeldMatch {
+  reasons: { field: 'title' | 'category' | 'world' | 'sub'; value: string; held: HeldEntry }[];
+}
+
 export interface ContentItem {
   id: string;
   code: string | null;
@@ -112,8 +139,16 @@ export interface ContentItem {
   livePublishedAt: string | null;
   liveApprovedBy: string | null;
   liveApprovedByEmail: string | null;
+  /** Live is the seeded bundle (approver id `workbook`): not a sign-off in this system. */
+  liveSeeded: boolean;
+  liveApprovalLabel: string | null;
   draft: ContentDraft | null;
   retired: boolean;
+  /** Send back as `expectedRev` on every write (409 CONTENT_CONFLICT when the item moved). */
+  rev: number;
+  provenance: ContentProvenance | null;
+  needsReview: boolean;
+  heldMatch: HeldMatch | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -130,6 +165,9 @@ export interface ContentSummary {
   liveVersion: number;
   draftState: DraftState | null;
   retired: boolean;
+  rev: number;
+  needsReview: boolean;
+  held: boolean;
   updatedAt: string;
 }
 
@@ -151,6 +189,9 @@ export interface ContentVersion {
   by: string;
   byEmail: string | null;
   from: number | null;
+  /** The seeded bundle (approvedBy `workbook`): not a clinician sign-off in this system. */
+  seeded: boolean;
+  approvalLabel: string | null;
 }
 
 export interface ContentVersionDetail extends ContentVersion {
@@ -176,7 +217,15 @@ export interface ContentChange {
   byEmail: string | null;
   note: string | null;
   at: string;
-  meta: { version?: number; summary?: string[]; state?: DraftState } | null;
+  meta: {
+    version?: number;
+    summary?: string[];
+    state?: DraftState;
+    selfApproved?: boolean;
+    acknowledgedHeld?: boolean;
+    clearedReview?: string[];
+    restoredReview?: string[];
+  } | null;
 }
 
 export interface ContentImportItem {
@@ -188,10 +237,23 @@ export interface ContentImportItem {
   body?: Record<string, unknown>;
 }
 
+export interface ContentImportItemResult {
+  id: string;
+  status: 'created' | 'updated' | 'rejected';
+  reason?: string;
+  details?: string[];
+  /** Updates: the draft state the import replaces (null = no draft). */
+  replacedDraft?: DraftState | null;
+  /** Held-list matches. */
+  held?: string[];
+}
+
 export interface ContentImportResult {
   created: string[];
   updated: string[];
   rejected: { id: string; reason: string }[];
+  results: ContentImportItemResult[];
+  dryRun: boolean;
 }
 
 export interface ContentListQuery {
@@ -201,6 +263,7 @@ export interface ContentListQuery {
   category?: string;
   type?: string;
   only?: string;
+  needsReview?: 'true' | 'false';
   page?: number;
   limit?: number;
 }

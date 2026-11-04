@@ -1,15 +1,16 @@
-> **Copy for reference.** The source of truth is `backend/docs/ADMIN_API.md` in the app repo (`atefefazaeli-netizen/app`). When they differ, the backend file wins; update this copy from it. Copied on 2026-11-03. Notes on how the panel reads the open points are in [ARCHITECTURE.md](ARCHITECTURE.md#10-contract-notes).
+> **Copy for reference.** The source of truth is `backend/docs/ADMIN_API.md` in the app repo (`atefefazaeli-netizen/app`). When they differ, the backend file wins; update this copy from it. Copied on 2026-11-04 (accounts audit). Notes on how the panel reads the open points are in [ARCHITECTURE.md](ARCHITECTURE.md#10-contract-notes).
 
 # Thirdwheel Admin API · shared contract (v1)
 
 Source of truth for the backend builders and the panel builder. All routes sit under `/api/v1`.
-Errors use the existing shape `{ statusCode, message, code?, requestId, retryAt? }`.
+Errors use the existing shape `{ statusCode, message, code?, requestId, retryAt? }`. Every 429 has `code: 'RATE_LIMITED'`, `retryAt` and a `Retry-After` header (seconds), exposed to the panel by CORS.
 Lists use the existing pagination: query `page` (1-based), `limit` (≤100); response
 `{ items, meta: { page, limit, total, totalPages } }` (`Paginated` / `paginate` in `libs/common/src`).
 
 ## Roles
 - `admin` (ADMIN_EMAILS) and `clinician` (CLINICIAN_EMAILS). An account can hold both.
-- Roles are re-synced from env at every sign-in (email OTP verify and social sign-in), so env changes apply on the next sign-in. Access tokens already carry roles through `JwtStrategy` (it reads the account).
+- Roles come from the env lists as they are now, on every authenticated request (`JwtStrategy`), every refresh and every sign-in: removing an email from `ADMIN_EMAILS` or `CLINICIAN_EMAILS` (and restarting) takes the staff role away at the next request with the token the person already holds, and adding one grants it the same way. The stored `roles` field is only a cache and never grants staff access. `AdminAccountRow.roles` and the `STAFF_ACCOUNT` check read the current roles.
+- A role refusal is 403 with `code: 'INSUFFICIENT_ROLE'` (a suspended account is 403 `ACCOUNT_SUSPENDED`).
 - Panel access = admin or clinician. `GET users/me` style check: panel calls `GET admin/me` → `{ userId, email, roles }` (any staff role, 403 otherwise).
 - Clinician-only: approve content, request changes. Admin-only: everything that changes accounts, AI settings, integrations, content drafts. Both: read content, review queue, safety log (read, review, notes, escalate), dashboard, audit log (admin only).
 
@@ -18,17 +19,18 @@ Same endpoints as the app: `POST auth/email/start` → `POST auth/email/verify` 
 
 ## Audit
 Every admin/clinician/n8n write publishes `audit.recorded` (contract in `admin.contracts.ts`). The admin module stores it.
-- `GET admin/audit?actor=&action=&target=&page=&limit=` (admin) → page of `{ id, actor, actorEmail, action, target, meta, at }`.
+- `GET admin/audit?actor=&action=&target=&page=&limit=` (admin) → page of `{ id, actor, actorEmail, action, target, meta, at }`. `actor` matches exactly; `action` and `target` match exactly or as a prefix (`content.`, `user:<id>`, `webhook:`).
 
 ## Dashboard
 - `GET admin/me` (staff) → `{ userId, email, roles }`
-- `GET admin/stats` (staff) → `{ accounts, signups7d, suspended, couples, plus, grants, content: { live, inReview, changesRequested, retired }, safety: { open, openHigh, last24h }, support: { open }, webhooks: { failed24h } }`. Each part comes from its owner via bus requests; a part that fails reads `null`.
+- `GET admin/stats` (staff) → `{ accounts, signups7d, suspended, couples, plus, grants, content: { live, inReview, changesRequested, retired, needsReview }, safety: { open, openHigh, last24h }, support: { open }, webhooks: { failed24h } }`. Each part comes from its owner via bus requests; a part that fails reads `null`.
 
 ## Users & couples (admin module aggregates; owners write)
 - `GET admin/users?q=&plan=free|plus|paid_by_partner|cancelled|payment_problem&linked=true|false&suspended=true|false&tag=&from=&to=&page=&limit=` (admin)
   - `q` matches email (contains) OR name (users module). from/to = registration date (ISO date).
   - Row: `{ userId, email, name, createdAt, plan, plus, linked, partner: { userId, name } | null, suspended, tags }`
-- `GET admin/users/:id` (admin) → `{ account: AdminAccountRow, profile: AdminProfileView | null, couple: { coupleId, linkedAt, partner: { userId, name, email } } | null, subscription: AdminSubscriptionView | null, safety: { open, total, lastAt }, support: { total, open } }`
+- `GET admin/users/:id` (admin) → `{ account: AdminAccountRow, profile: AdminProfileView | null, couple: { coupleId, linkedAt, partner: { userId, name, email } } | null, subscription: AdminSubscriptionView | null, safety: { open, total, lastAt }, support: { total, open }, unavailable: ('profile'|'couple'|'subscription'|'safety'|'support')[] }` (`unavailable` names the parts that are null because their owner failed, not because there is nothing)
+- AdminSubscriptionView: `{ userId, state, plus, renewsAt, grant: { until, by, note } | null, experiencesUsed, source: 'store'|'admin_grant'|'partner'|'none', verification: 'mock'|'store'|null }`. `source` says where the current Plus comes from (same precedence as the app's state); `verification` says how the store purchase behind it (own or the partner's) was checked: `mock` while the server runs the development receipt verifier (`mock:<product>:<transaction>`, no App Store or Play check), `store` with a real adapter, null when no store purchase is involved. Show `mock` as unverified. No revenue or billing figures.
 - `POST admin/users/:id/sign-out` (admin) → `{ ok: true }` (revokes refresh tokens, bumps token version)
 - `POST admin/users/:id/suspend` `{ reason (1..300) }` → AdminAccountRow. Also signs out.
 - `POST admin/users/:id/unsuspend` → AdminAccountRow
@@ -46,7 +48,7 @@ Server side: `chat.risk_detected` → flag with surface `third-ear-server`; `cha
 Folding: same user + kind with an open flag whose lastAt is within 10 min → `count++`, `lastAt` updated, no new event.
 Levels: crisis high, safety medium, heat low. Retention: deleted 180 days after lastAt (TTL), and on account deletion. Included in the person's data export (kind, level, surface, dates, status; staff notes included).
 Panel (admin or clinician):
-- `GET admin/safety/flags?status=open|reviewed|escalated&level=&kind=&userId=&from=&to=&page=&limit=` → page of SafetyFlag
+- `GET admin/safety/flags?status=open|reviewed|escalated&level=&kind=&surface=third-ear|third-ear-server|quiz|answer|other&userId=&from=&to=&page=&limit=` → page of SafetyFlag (every filter runs on the server; an unknown surface is 400)
 - `GET admin/safety/flags/:id` → SafetyFlag
 - `POST admin/safety/flags/:id/review` `{ note?: ≤2000 }` → SafetyFlag (status reviewed)
 - `POST admin/safety/flags/:id/notes` `{ text: 1..2000 }` → SafetyFlag
@@ -60,8 +62,22 @@ Item (admin/clinician view):
 ContentItem {
   id, code, pillar: 'quiz'|'play'|'do', kind,
   live: ContentSnapshot | null, liveVersion: number, livePublishedAt, liveApprovedBy,
+  liveSeeded: boolean, liveApprovalLabel: string | null,   // seeded = approver id 'workbook': NOT a sign-off in this system
   draft: { snapshot: ContentSnapshot, state: 'editing'|'in_review'|'changes_requested', note: string|null, by, at, source: 'panel'|'n8n' } | null,
-  retired: boolean, createdAt, updatedAt
+  retired: boolean,
+  rev: number,                       // send back as expectedRev on every write
+  provenance: Provenance | null,     // seeded items only
+  needsReview: boolean,              // live has parts no clinician has reviewed here
+  heldMatch: { reasons: [{ field: 'title'|'category'|'world'|'sub', value, held: { type, world, item, why } }] } | null,
+  createdAt, updatedAt
+}
+Provenance {
+  source: 'release1-bundle',
+  cleared: string[],                                  // parts that are the workbook's word for word
+  flagged: { part, reason }[],                        // what the seed analysis found (never changes)
+  needsReview: { part, reason }[],                    // what still needs a clinician for live
+  notes: string[],                                    // screen labels, default slider ends, trimmed design notes
+  clearedBy: { by, byEmail, at, version, via: 'approved'|'rollback'|'migration' } | null
 }
 ContentSnapshot { catalog: CatalogFields, body: { intro?, cards?: Card[], steps?: DoPlanStep[], deck?: object, howYouPlay?: 'One phone'|'Two phones', howItPlays?, how?, safety?, need?: string[], followUp? } }
 ```
@@ -70,26 +86,31 @@ ContentSnapshot { catalog: CatalogFields, body: { intro?, cards?: Card[], steps?
 Which body field plays (the seed follows it, the app reads it): `type-*` kinds play `deck` (the `TYPE_IDEAS` deck, with `howYouPlay`, and for games `howItPlays` and `safety`); `quiz-turn` and `quiz-deck` play `cards`; `do-home` and `do-outside` play `steps` with `intro` (the card's blurb) and `need`; Draw Me in 30 and Phone Stack carry the workbook's `how` and `safety`. Every item has `followUp` (the workbook's follow-up chip).
 Views also carry `liveApprovedByEmail` and `draft.byEmail`. Seeded content: 170 items (110 quizzes, 28 games, 32 Do cards); venues and shelf games are not content.
 
+**Seeded approval is not a sign-off.** The seed stores approver id `workbook` (kept for compatibility) and version action `seeded`. Views add `liveSeeded` / version `seeded: true` and the label "Seeded from the Release 1 bundle, not a sign-off in this system". Provenance (generated by `backend/scripts/content-provenance.cjs` into `content/domain/content.provenance.ts`) says which parts are the workbook's and which were written elsewhere: `steps` (Do blurb, What you need and steps an AI wrote from research notes, `doSteps.ts`: 30 items), `cards.options` / `deck.options` (answer options set by hand in `scripts/release1-workbook.py` PICK / SCALE / ITEM: 18 items), `deck` (deck lines written in the app's `play/types/content.ts`, including the trivia games' sample answers: 23 items). 70 of 170 items need clinical review. Parts named: `followUp`, `cards`, `deck`, `how`, `howItPlays`, `safety`, `steps`, `cards.options`, `deck.options`.
+**Clearing the flags (simplest honest rule).** Any approve after a submit clears `needsReview` for the whole item (the clinician approved the whole snapshot); the change log entry `approved` names the clinician (`by`) and lists `meta.clearedReview`, and `provenance.clearedBy` records who, when and which version. A rollback to a seeded version (approver `workbook`) brings the flags back (`meta.restoredReview`); a rollback to a clinician-approved version clears them (`via: 'rollback'`). Migration `20261105-01-content-provenance` backfills existing databases (`via: 'migration'` when live was already clinician-approved). The app ignores provenance.
+
 Panel routes (read: admin or clinician; write: as noted):
-- `GET admin/content?pillar=&q=&state=live|editing|in_review|changes_requested|retired&category=&type=&only=&page=&limit=` → page of ContentSummary `{ id, code, pillar, kind, title, category, type, only, liveVersion, draftState, retired, updatedAt }`
+- `GET admin/content?pillar=&q=&state=live|editing|in_review|changes_requested|retired&category=&type=&only=&needsReview=true|false&page=&limit=` → page of ContentSummary `{ id, code, pillar, kind, title, category, type, only, liveVersion, draftState, retired, rev, needsReview, held, updatedAt }`
 - `GET admin/content/facets` → `{ categories: string[], types: string[], kinds: string[] }`
 - `GET admin/content/:id` → ContentItem
 - `POST admin/content` (admin) `{ id (slug), code?, pillar, kind, snapshot }` → ContentItem (new, draft editing). 409 `CONTENT_EXISTS`.
-- `PUT admin/content/:id/draft` (admin) `{ snapshot }` → ContentItem. Creates the draft from live when none; editing an in_review or changes_requested draft moves it back to editing.
-- `DELETE admin/content/:id/draft` (admin) → ContentItem
-- `POST admin/content/:id/submit` (admin) `{ note? }` → in_review
-- `POST admin/content/:id/approve` (clinician) `{ note? }` → draft becomes live, liveVersion+1, version saved, event `content.published` (action published). 409 `NOT_IN_REVIEW`.
-- `POST admin/content/:id/request-changes` (clinician) `{ note (required) }` → changes_requested
-- `POST admin/content/:id/unpublish` (admin) → retired (hidden from the app and Explore). Event action unpublished.
-- `POST admin/content/:id/restore` (admin) → not retired. Event action restored.
-- `GET admin/content/:id/versions` → `[{ version, publishedAt, approvedBy, approvedByEmail, action: 'published'|'rolled_back'|'seeded', note, by, byEmail, from }]` (newest first; a rollback keeps the original approver in `approvedBy`, `by` is the admin who rolled back, `from` the version that went live again)
+- `PUT admin/content/:id/draft` (admin) `{ snapshot, expectedRev }` → ContentItem. Creates the draft from live when none; editing an in_review or changes_requested draft moves it back to editing.
+- `DELETE admin/content/:id/draft?expectedRev=` (admin) → ContentItem
+- `POST admin/content/:id/submit` (admin) `{ note?, expectedRev }` → in_review
+- `POST admin/content/:id/approve` (clinician) `{ note?, expectedRev, acknowledgeHeld? }` → draft becomes live, liveVersion+1, version saved, event `content.published` (action published). `expectedRev` is the revision of the draft the clinician reviewed. 409 `NOT_IN_REVIEW`, `CONTENT_CONFLICT`, `HELD_CONTENT` (the draft matches the held list and `acknowledgeHeld: true` was not sent; `details` name the matches). Change log `meta`: `selfApproved: true` when the approver is the draft's last editor, `acknowledgedHeld: true`, `clearedReview: string[]`. The same flags go into the audit event.
+- `POST admin/content/:id/request-changes` (clinician) `{ note (required), expectedRev }` → changes_requested
+- `POST admin/content/:id/unpublish` (admin) `{ expectedRev }` → retired (hidden from the app and Explore). Event action unpublished. 409 `NOT_PUBLISHED` for an item that was never approved (discard its draft instead).
+- `POST admin/content/:id/restore` (admin) `{ expectedRev }` → not retired. Event action restored. 409 `NOT_PUBLISHED` when there is no approved version to show.
+- `GET admin/content/:id/versions` → `[{ version, publishedAt, approvedBy, approvedByEmail, action: 'published'|'rolled_back'|'seeded', note, by, byEmail, from, seeded, approvalLabel }]` (newest first; a rollback keeps the original approver in `approvedBy`, `by` is the admin who rolled back, `from` the version that went live again)
 - `GET admin/content/:id/versions/:version` → `{ version, snapshot, … }`
-- `POST admin/content/:id/rollback` (admin) `{ version, note? }` → live = that (already approved) snapshot as a new version (action rolled_back). Event action rolled_back. 409 `ALREADY_LIVE` for the live version, 404 `VERSION_NOT_FOUND`.
-- `GET admin/content/:id/changes?page=&limit=` → page of `{ action, by, byEmail, note, at, meta: { version?, summary?: string[], state? } | null }`, newest first. `summary` names what changed ("catalog.title", "body.cards: 2 changed, 1 added"), never the text.
-- `POST admin/content/import` (admin) `{ items: ContentImportItem[] (≤200), note? }` → ContentImportResult (drafts in review, never live)
+- `POST admin/content/:id/rollback` (admin) `{ version, note?, expectedRev }` → live = that (already approved) snapshot as a new version (action rolled_back). Event action rolled_back. 409 `ALREADY_LIVE` for the live version, 404 `VERSION_NOT_FOUND`.
+- `GET admin/content/:id/changes?page=&limit=` → page of `{ action, by, byEmail, note, at, meta: { version?, summary?: string[], state?, selfApproved?, acknowledgedHeld?, clearedReview?: string[], restoredReview?: string[] } | null }`, newest first. `summary` names what changed ("catalog.title", "body.cards: 2 changed, 1 added"), never the text.
+- `POST admin/content/import` (admin) `{ items: ContentImportItem[] (≤200), note?, dryRun? }` → ContentImportResult `{ created, updated, rejected, results: [{ id, status: 'created'|'updated'|'rejected', reason?, details?, replacedDraft?, held? }], dryRun }` (drafts in review, never live). `dryRun: true` checks every item exactly as a real import would (validation, pillar and kind of an existing id, ids listed twice, held list) and writes nothing; the panel uses it for its preview. `replacedDraft` on an update is the draft state that import replaces (null = none). The panel imports JSON only: the workbook is an .xlsx converted by `scripts/release1-workbook.py` (product decision: no xlsx import in the panel).
 Validation: snapshot JSON ≤ 256 KB; card text 1..1000 (≤ 100 cards); title 1..120; where ⊂ anywhere|home|out|outside|apart (non-empty); minutes 1..10080 (a week: the seeded week-long Do cards are 10080, so 600 would reject them); step title 1..200 and body 1..1000 (≤ 30 steps); every other string ≤ 1000; `type-*` kinds need a `deck` with a `type`, `quiz-turn` and `quiz-deck` need at least one card. Id: slug `[a-z0-9][a-z0-9-]{0,79}`; code like `Q-1-01`. Rejected with 400 `INVALID_CONTENT` and `details: string[]` (passed through by the error filter).
+**Concurrency (client controlled).** Every item view and summary carries `rev`, bumped on every write. Every write on an item (PUT and DELETE draft, submit, approve, request-changes, rollback, unpublish, restore) requires `expectedRev` (400 without it); when the item's `rev` differs, 409 `CONTENT_CONFLICT` with `details: ['rev: you had N, the item is at M']` and nothing changes. Create and import do not take it (an import replaces the draft by design; n8n has no revision to send).
+**Held content.** `heldMatch` compares the current snapshot's catalog with the workbook's "Not in this release" sheet (`HELD_CONTENT`, generated from the app's `WB_HELD`): a title containing a held item's name ("Repair walk, 20 minutes"), or a category / world / sub naming Clear the air (`clear-air`, `clear-the-air`). Held rows have no codes, so codes are not matched. Summaries carry `held`. Approve then needs `acknowledgeHeld: true`; nothing is ever published automatically.
 Other errors: 404 `CONTENT_NOT_FOUND`, 409 `CONTENT_CONFLICT` (someone else changed the item first: reload), 409 `NO_DRAFT` (discard or submit without a draft), 409 `ALREADY_IN_REVIEW`, 403 `CLINICIAN_ONLY` (also checked in the domain), 400 `NOTE_REQUIRED`, 409 `ALREADY_RETIRED` / `NOT_RETIRED`, 409 `PILLAR_MISMATCH` (an import can't change an item's pillar or kind).
-Notes: approving a draft of a retired item updates live but keeps it hidden. An account with both roles may approve its own draft. The panel list sorts by pillar, code, id; `title`, `category`, `type`, `only` come from the draft when there is one, else live. `POST admin/content/import` from the panel stores `source: 'panel'`; n8n's `content.import` stores `source: 'n8n'`.
+Notes: approving a draft of a retired item updates live but keeps it hidden (not in `content/published` items, not in Explore; the event carries `retired: true`). An account with both roles may approve its own draft (not decided by the product owner; recorded as `selfApproved`). The panel list sorts by pillar, code, id; `title`, `category`, `type`, `only` come from the draft when there is one, else live. `POST admin/content/import` from the panel stores `source: 'panel'`; n8n's `content.import` stores `source: 'n8n'`.
 App routes:
 - `GET content/manifest` (user) → `{ revision, updatedAt }` (global counter that goes up on every publish / rollback / unpublish / restore)
 - `GET content/published?since=<revision>` (user) → `{ revision, items: PublishedContentItem[], retired: string[] }` (items whose live changed after `since`; since=0 returns everything that differs from the bundled seed: versions after the seed, items made in the panel and approved (their version 1), restored items, plus all retired). Each item stores the revision its live state last changed at; the revision is read before the items, so a publish racing the read is fetched again next time.
@@ -97,9 +118,9 @@ Seed: migration `20261104-01-seed-content` loads the bundled Release 1 content (
 
 ## AI engine (admin; clinician read-only)
 - `GET admin/ai/settings` → `{ current: AiRuntimeSettings, defaults: { provider, anthropic, openai, prompts: { modes: Record<mode,string>, quizStyle: string }, supports: { temperature: { anthropic: false, openai: true } } }, keys: { anthropic: boolean, openai: boolean }, modes: string[], locked: { chatRules: string, chatOutput: string, quizRules: string } }`. Before any save `current` is the environment's settings with `version: 0`. `supports` says which client takes a temperature (the Anthropic client takes none; effort is its control).
-- `PUT admin/ai/settings` (admin) `{ provider, anthropic, openai, fallbackOnly, prompts, note? }` → AiRuntimeSettings (version+1). 400 `PROVIDER_NOT_CONFIGURED` when the chosen provider (anthropic or openai) has no API key. Prompt text ≤ 1500 chars each; null or blank = default. `prompts.modes` keys must be in `modes` (else 400 `INVALID_AI_SETTINGS`); missing keys are stored as null. `openai.temperature` 0..2 or null. `anthropic.effort` low|medium|high|xhigh|max. `note` ≤ 300. Two saves at the same moment: 409 `SETTINGS_CONFLICT`.
+- `PUT admin/ai/settings` (admin) `{ provider, anthropic, openai, fallbackOnly, prompts, note? }` → AiRuntimeSettings (version+1). 400 `PROVIDER_NOT_CONFIGURED` when the chosen provider (anthropic or openai) has no API key. Prompt text ≤ 1500 chars each; null or blank = default. `prompts.modes` keys must be in `modes` (else 400 `INVALID_AI_SETTINGS`); missing keys are stored as null. `openai.temperature` 0..2 or null. `anthropic.effort` low|medium|high|xhigh|max. `note` ≤ 300. Optional `baseVersion` (integer ≥ 0): the version the change was made on (`current.version` when the page loaded); when another save landed since, 409 `SETTINGS_CONFLICT` and nothing is saved. Without it the save goes over whatever is current, and two saves at the same moment still answer 409 `SETTINGS_CONFLICT`.
 - `GET admin/ai/settings/history?page=&limit=` → page of `{ version, updatedAt, updatedBy, updatedByEmail, note, settings }` (newest first; `settings` is the full AiRuntimeSettings of that version)
-- `POST admin/ai/settings/rollback` (admin) `{ version }` → AiRuntimeSettings (as a new version, note "Rollback to version N"). 404 `VERSION_NOT_FOUND`; 400 `PROVIDER_NOT_CONFIGURED` if that version's provider has lost its key.
+- `POST admin/ai/settings/rollback` (admin) `{ version, baseVersion? }` (409 `SETTINGS_CONFLICT` as for PUT) → AiRuntimeSettings (as a new version, note "Rollback to version N"). 404 `VERSION_NOT_FOUND`; 400 `PROVIDER_NOT_CONFIGURED` if that version's provider has lost its key.
 - `POST admin/ai/test` (admin) `{ mode, text ≤ 1000, draft?: settings }` → 200 `{ source: 'ai'|'fallback'|'risk', reply, latencyMs, provider, model }`. `mode` is a Third Ear mode or `quiz` (the quiz result writer). Runs `detectRisk` first (and on the model's reply); nothing is stored. `draft` is validated like PUT. AI off (fallbackOnly, provider none) or a failed or malformed reply → `source: 'fallback'` with an explanation in `reply`. Throttle 10/min.
 - Editable: the task line per Third Ear mode and the quiz result style. Locked (returned read-only in `locked`): who Third Ear is, the safety rules, the JSON output contracts, the quiz privacy rules. The AI quiz and game question prompt is not editable.
 - Every save and rollback publishes `ai-engine.settings_changed` and `audit.recorded` (actions `ai.settings.update`, `ai.settings.rollback`, target `ai-settings:<version>`).
@@ -124,7 +145,7 @@ Retries: 2xx = delivered. Otherwise retry with backoff 1m, 5m, 30m, 2h, 6h (6 at
 Payload `data`:
 - `crisis.alert`: `{ flagId, userId, kind, level, surface, helplineShown, count, at, escalated: boolean, escalatedBy: string|null, note: string|null, panelUrl }` (only high and medium flags, plus every escalation). `panelUrl` = `PANEL_URL/safety/<flagId>`.
 - `support.ticket.created`: `{ ticketId, ref, userId, kind, topic, text, hasScreenshot, at, panelUrl }`. `panelUrl` = `PANEL_URL/support/<ticketId>`.
-- `content.published`: `{ itemId, code, pillar, title, version, action, by, at }`
+- `content.published`: `{ itemId, code, pillar, title, version, action, by, at, retired }` (`retired: true` = the item is unpublished, so this version is not visible in the app: do not announce it)
 - `user.subscription.changed`: `{ userId, state, plus, at }`
 - `ping`: `{ message: 'Thirdwheel webhook test', at }`
 API keys (incoming):
@@ -133,18 +154,23 @@ API keys (incoming):
 - `DELETE admin/integrations/api-keys/:id` → revokes (204; revoking again is a no-op). 404 `API_KEY_NOT_FOUND`.
 Incoming action (public route, API key):
 - `POST integrations/n8n/action` headers `X-Api-Key: twk_…`, optional `Idempotency-Key` (8..80 of `A-Za-z0-9_-`; the shared idempotency mechanism, per API key: a retry within 24 h gets the first answer with `Idempotent-Replay: true`, a duplicate while the first runs gets 409 `REQUEST_IN_PROGRESS`). Body `{ action, data }`:
-  - `user.suspend` `{ userId, reason (1..300) }` (scope users.flag) → `auth.admin.suspend`
+  - `user.suspend` `{ userId, reason (1..300) }` (scope users.flag) → `auth.admin.suspend`. Never a staff account (admin or clinician): 409 `STAFF_ACCOUNT`, so an automation can't lock the team out of the panel.
   - `user.unsuspend` `{ userId }` (users.flag) → `auth.admin.unsuspend`
   - `user.tag` `{ userId, add?: string[], remove?: string[] }` (users.flag; each tag 1..32 of `[a-z0-9-]`, ≤ 20 per list, at least one tag in all) → `auth.admin.tags`
   - `content.import` `{ items: ContentImportItem[] 1..200, note? ≤ 500 }` (content.import) → `content.import` → drafts in review only
-  - Response 200 `{ ok: true, action, result }` (`result` = the owner's answer). 401 `API_KEY_INVALID`, 403 `API_KEY_SCOPE`, 400 `UNKNOWN_ACTION`, 400 `INVALID_ACTION_DATA` (with `details`), 503 `ACTION_UNAVAILABLE` (the owning module does not answer); the owner's own errors pass through. Throttle 60/min per key. Audit actor `apikey:<name>`, action `n8n.<action>`.
+  - Response 200 `{ ok: true, action, result }` (`result` = the owner's answer). 401 `API_KEY_INVALID`, 403 `API_KEY_SCOPE`, 400 `UNKNOWN_ACTION`, 400 `INVALID_ACTION_DATA` (with `details`), 400 `IDEMPOTENCY_KEY_INVALID` (an `Idempotency-Key` that is not 8..80 of `A-Za-z0-9_-`; nothing runs), 503 `ACTION_UNAVAILABLE` (the owning module does not answer); the owner's own errors pass through. Throttle 60/min per key; 20 failed key checks a minute from one address get 429 `RATE_LIMITED` (also for a valid key from that address until the minute ends). Audit actor `apikey:<name>`, action `n8n.<action>`.
 Bus: the integrations module answers `integrations.admin.stats` → `{ webhooks (enabled), failed24h }`.
 
-## Support (existing, unchanged routes)
-`GET support/tickets?status=&page=&limit=`, `PUT support/tickets/:id/status`, `GET support/tickets/:id/screenshot` (admin). New: the support module publishes `support.ticket_created` after a ticket is saved.
+## Support (admin)
+`GET support/tickets?status=&page=&limit=`, `GET support/tickets/:id` (one ticket, for deep links; 404 `TICKET_NOT_FOUND`), `PUT support/tickets/:id/status` `{ status: open|closed }` (404 `TICKET_NOT_FOUND`; audit `support.ticket_status`, target `support_ticket:<id>`, meta `{ userId, status }`), `GET support/tickets/:id/screenshot` (404 `TICKET_NOT_FOUND` or `SCREENSHOT_NOT_FOUND`). Ticket: `{ id, ref, userId, kind: message|problem, topic, text, device, hasScreenshot, status, createdAt }`. The support module publishes `support.ticket_created` after a ticket is saved.
+Not built and not in the requirements (open product decisions): replies to the person from the panel, internal notes, assignment, priority. The app tells the person "Support will reply by email" (Help & legal › Contact support), and each ticket is emailed to `SUPPORT_INBOX_EMAIL` when set; nothing in PROJECT_CONTEXT §10 or the Figma-derived screens asks for in-panel replies.
 
 ## Legacy catalog and experiences (existing routes, admin)
 `GET/POST catalog/items`, `PATCH/DELETE catalog/items/:id`; `GET/POST experiences`, `PATCH/DELETE experiences/:id`. Read the controllers/DTOs for exact shapes. Venue booking links: `PUT/DELETE ideas/:id/booking-link`.
+- `GET catalog/admin/items?where=&kind=&maxUsd=&page=&limit=` (admin) → page of the ideas with `tags` and `refPrefix` (the public `GET catalog/items` strips both), read fresh.
+- `POST catalog/items`: `id` is optional; without it the server takes the next free id after every id ever used (retired ideas keep theirs). 409 `CATALOG_ITEM_EXISTS`. `PATCH` and `DELETE`: 404 `CATALOG_ITEM_NOT_FOUND`. A `null` optional field in a PATCH clears it (the panel sends null for fields the admin emptied). `per` (the price suffix the app appends to the price) is stored with exactly one leading space, whatever was sent; migration `20261104-30` repairs suffixes an earlier save had trimmed.
+- Experiences: 409 `EXPERIENCE_EXISTS`, 404 `EXPERIENCE_NOT_FOUND`; null clears an optional field as above. `DELETE ideas/:id/booking-link`: 404 `BOOKING_LINK_NOT_FOUND`.
+- Every write is audited: `catalog.item.create|update|retire` (`catalog_item:<id>`, update meta `fields`), `experience.create|update|retire` (`experience:<id>`), `booking_link.set|remove` (`booking_link:<card id>`, set meta `{ host, paid, venue }`, never the full URL).
 
 ## CORS
 Add the panel origin (`PANEL_URL`) to `CORS_ORIGINS` in deployment docs. The panel's dev server proxies `/api` to the API instead.

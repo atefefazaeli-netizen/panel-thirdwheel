@@ -1,0 +1,2119 @@
+{
+ "provenance": {
+  "know-me-core": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "guess-my-order": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "would-you-rather-classic-silly": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 3 cards (#3, #6, #9) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "money-splurge-or-stash": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "future-postcards-from-2036": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 1 card (#2) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "home-dishes-or-laundry-forever": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 1 card (#1) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "never-have-i-ever-classics": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "never-have-i-ever-travel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "our-origin-story-directors-cut": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "1 line of 13 in the V-GN deck is not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": []
+  },
+  "home-the-hill-ill-die-on": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Answer options for 3 cards (#1, #2, #5) were set by hand in the generator (release1-workbook.py SCALE), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "food-crimes-court": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Answer options for 1 card (#2) were set by hand in the generator (release1-workbook.py SCALE), not spelled out by the card."
+    }
+   ],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)",
+    "3 sliders use the generator's default ends (Disagree / Agree or No / Yes)"
+   ]
+  },
+  "values-mini-moral-dilemmas": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "3 sliders use the generator's default ends (Disagree / Agree or No / Yes)"
+   ]
+  },
+  "my-perfect-day": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "routines-and-pet-peeves": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 4 cards (#1, #2, #3, #5) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "who-i-was-before-you": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "past-relationships-lightly": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "how-i-like-to-be-shown-care": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "2 lines of 4 in the V-RK deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: sub"
+   ]
+  },
+  "small-gestures-that-land": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "words-i-need-to-hear": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "gifts-big-small-or-none": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "36-questions-set-i-warm-up": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "36-questions-set-ii-values-and-memories": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "36-questions-set-iii-the-deep-end": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "childhood-memories": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "how-love-was-shown-at-home": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "teen-me": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "hometown-and-places": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "fears-and-worries": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "proudest-moments": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "comfort-me-like-this": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "how-i-handle-stress": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "social-battery": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "7 sliders use the generator's default ends (Disagree / Agree or No / Yes)"
+   ]
+  },
+  "fun-type-quizzes": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "what-helps-me-feel-safe": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "5 sliders use the generator's default ends (Disagree / Agree or No / Yes)"
+   ]
+  },
+  "how-my-brain-works": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "7 sliders use the generator's default ends (Disagree / Agree or No / Yes)"
+   ]
+  },
+  "how-we-met-both-versions": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "when-i-knew": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "firsts": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "favourite-memory": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "more-of-less-of": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "how-close-we-feel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "1 slider use the generator's default ends (Disagree / Agree or No / Yes)"
+   ]
+  },
+  "weekly-check-in": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "our-year-in-review": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "things-i-love-about-you": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "thank-you-for": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "what-i-admire-in-you": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "green-and-red-flags": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "personal-boundaries": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "support-me-on-stressful-days": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "share-a-win": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "hellos-and-goodbyes": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "our-perfect-ordinary-day": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "our-ground-rules-contraception-and-tests": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: deck, placeholder",
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "the-chips-what-made-it-work": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "strangers-again": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "grey-area": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "slow-burn": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "perels-four-chips": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "what-lands": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Answer options for 1 card (#4) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": [
+    "catalog title differs from the workbook title (Explore naming)"
+   ]
+  },
+  "off-limits": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Answer options for 2 cards (#3, #4) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "just-imagine": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "my-money-story": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "spender-or-saver": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 2 cards (#1, #6) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "joint-separate-or-both": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 1 card (#2) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "debt-no-judgment": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "who-does-what": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "invisible-to-dos": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "pet-peeves-at-home": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 1 card (#4) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "sleep-habits": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 1 card (#1) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "holidays-whose-family-when": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "family-expectations": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "dream-job": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "work-stress-at-home": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "work-life-balance": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 2 cards (#1, #2) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "what-success-means-to-me": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "posting-us-online": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "fitness-and-habits": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "food-and-diet": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "cards.options",
+     "reason": "Answer options for 2 cards (#1, #4) were set by hand in the generator (release1-workbook.py PICK), not spelled out by the card."
+    }
+   ],
+   "notes": []
+  },
+  "when-one-of-us-is-sick": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "social-battery-and-nights-out": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "alone-time-i-need": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "weekend-styles": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "places-to-go": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "things-to-try-together": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "this-years-list": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "skills-to-learn": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "kids-yes-no-maybe-when": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: answers"
+   ]
+  },
+  "parenting-styles": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "who-stays-home": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "our-timelines": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "moving-in": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "marriage-views-and-timing": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "our-5-year-picture": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "where-wed-live": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "a-dream-i-parked": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "backing-each-others-dreams": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "growth-goals": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "top-5-values": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "1 line of 1 in the V-RK deck is not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: sub"
+   ]
+  },
+  "dealbreakers": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "money-vs-principle": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "what-i-believe": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "raising-kids-with-faith": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "rituals-and-practice": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "traditions-to-keep": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "two-cultures-one-home": {
+   "source": "release1-bundle",
+   "cleared": [
+    "cards",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "if-one-of-us-got-sick": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "wills-and-wishes": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "causes-we-care-about": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "1 line of 3 in the V-RK deck is not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: sub"
+   ]
+  },
+  "what-we-stand-for": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "what-wed-pass-on": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "would-you-rather-duel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Options in 3 rounds come from answer options set by hand in the generator (Q-1-03#3, Q-1-03#6, Q-1-03#9)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "couple-trivia": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "6 lines of 7 in the L-TY deck are not in the workbook (written in the app's play/types/content.ts). They include sample answers the game scores guesses against."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "whos-more-likely": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "3 lines of 3 in the L-PP deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "never-have-i-ever-call-it": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "11 lines of 16 in the L-PP deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: overline",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "speed-this-or-that": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "17 lines of 20 in the L-SP deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "draw-me-in-30": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "how",
+    "safety"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "charades-our-memories": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "5 lines of 6 in the L-AC deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "rank-off": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "3 lines of 3 in the L-RK deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: sub",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "guess-my-answer": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Options in 4 rounds come from answer options set by hand in the generator (Q-2-02#1, Q-2-02#2, Q-2-02#3, Q-2-02#5)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "two-truths-and-a-lie-before-us": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "4 lines of 4 in the V-2T deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "childhood-trivia": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "8 lines of 8 in the L-TY deck are not in the workbook (written in the app's play/types/content.ts). They include sample answers the game scores guesses against."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "our-story-trivia": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "10 lines of 10 in the L-TY deck are not in the workbook (written in the app's play/types/content.ts). They include sample answers the game scores guesses against."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "who-said-it": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "3 lines of 8 in the L-TY deck are not in the workbook (written in the app's play/types/content.ts). They include sample answers the game scores guesses against."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "green-or-red-flag": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "spicy-truth-or-dare": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "10 lines of 10 in the L-TD deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "howItPlays: the workbook's design notes were left out",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "off-limits-duel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "1 line of 6 in the L-PP deck is not in the workbook (written in the app's play/types/content.ts)."
+    },
+    {
+     "part": "deck.options",
+     "reason": "Options in 2 rounds come from answer options set by hand in the generator (Q-4-08#3, Q-4-08#4)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: overline",
+    "howItPlays: the workbook's design notes were left out",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "spicy-dice": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "10 lines of 12 in the L-DC deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "howItPlays: the workbook's design notes were left out",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "strangers-again-pick-up-duel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "7 lines of 8 in the L-WJ deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "howItPlays: the workbook's design notes were left out",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "money-habit-guess": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck.options",
+     "reason": "Options in 2 rounds come from answer options set by hand in the generator (Q-5-02#1, Q-5-02#6)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "chore-draft": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "10 lines of 10 in the L-DR deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: claim, guess",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "family-trivia": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "9 lines of 9 in the L-TY deck are not in the workbook (written in the app's play/types/content.ts). They include sample answers the game scores guesses against."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "dream-job-guess": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "3 lines of 3 in the L-PP deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "weekend-duel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "phone-stack": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "how",
+    "safety"
+   ],
+   "needsReview": [],
+   "notes": []
+  },
+  "parent-trivia": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "8 lines of 9 in the L-TY deck are not in the workbook (written in the app's play/types/content.ts). They include sample answers the game scores guesses against."
+    }
+   ],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "bucket-list-draft": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: claim, guess",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "moral-dilemma-duel": {
+   "source": "release1-bundle",
+   "cleared": [
+    "deck",
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [],
+   "notes": [
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "values-rank-off": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp",
+    "howItPlays",
+    "safety"
+   ],
+   "needsReview": [
+    {
+     "part": "deck",
+     "reason": "3 lines of 3 in the L-RK deck are not in the workbook (written in the app's play/types/content.ts)."
+    }
+   ],
+   "notes": [
+    "deck screen labels written in the app: sub",
+    "safety: the workbook's design notes were left out"
+   ]
+  },
+  "lip-sync-battle": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "blind-taste-test": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "recreate-a-movie-scene": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "something-neither-of-us-has-done": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "a-love-note-their-way": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "act-of-service-day": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "cook-my-childhood-dish": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "comfort-kit": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "recreate-our-first-date-at-home": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "sunday-check-in-10-minutes": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "three-thank-yous-tonight": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "start-one-ritual": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "upgrade-hello-and-goodbye": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "watch-the-same-film-together": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "set-our-safe-word": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "position-of-the-week": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "try-one-matched-fantasy": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "strangers-at-the-bar": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "three-minute-game-night": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "hands-only-night": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "one-change-with-a-start-date": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "money-date-30-minutes": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "chore-swap-week": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: ask, lead, task"
+   ]
+  },
+  "phone-free-dinner": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "alone-time-hour": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "15-minute-decompress-after-work": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "cook-a-healthy-dinner-together": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "plan-the-holidays": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "tag-team-bedtime-week": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [],
+   "notes": [
+    "deck screen labels written in the app: ask, lead, task"
+   ]
+  },
+  "plan-one-bucket-list-item": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "dream-backing-hour": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  },
+  "volunteer-together": {
+   "source": "release1-bundle",
+   "cleared": [
+    "followUp"
+   ],
+   "needsReview": [
+    {
+     "part": "steps",
+     "reason": "Blurb, What you need and steps written by an AI from the workbook research notes (doSteps.ts). Not reviewed by the product owner or a clinician."
+    }
+   ],
+   "notes": []
+  }
+ },
+ "held": [
+  {
+   "type": "Game",
+   "world": "Laughs",
+   "item": "Windfall Guess",
+   "why": "Cut"
+  },
+  {
+   "type": "Game",
+   "world": "Know Me",
+   "item": "Mood Decoder",
+   "why": "No scenarios yet"
+  },
+  {
+   "type": "Game",
+   "world": "Spicy",
+   "item": "Strip Quiz",
+   "why": "Decision needed: penalty conflicts with clinical review"
+  },
+  {
+   "type": "Game",
+   "world": "Future",
+   "item": "Baby Names Draft",
+   "why": "No name list yet"
+  },
+  {
+   "type": "Do",
+   "world": "Know Me",
+   "item": "Recreate my perfect morning",
+   "why": "No real format found"
+  },
+  {
+   "type": "Do",
+   "world": "Us",
+   "item": "Open-when letters",
+   "why": "No real format found"
+  },
+  {
+   "type": "Do",
+   "world": "Spicy",
+   "item": "Slow-burn week",
+   "why": "No source for the 5–7 day structure"
+  },
+  {
+   "type": "Do",
+   "world": "Spicy",
+   "item": "Read it together",
+   "why": "Needs licensed excerpts"
+  },
+  {
+   "type": "Do",
+   "world": "Spicy",
+   "item": "Compliment night",
+   "why": "No source for the format"
+  },
+  {
+   "type": "Do",
+   "world": "Real Life",
+   "item": "Sitter swap or a kid-free hour",
+   "why": "No real format found"
+  },
+  {
+   "type": "Do",
+   "world": "Future",
+   "item": "Vision-board night",
+   "why": "No real format found"
+  },
+  {
+   "type": "Do",
+   "world": "Future",
+   "item": "Cook from my roots",
+   "why": "No real format found"
+  },
+  {
+   "type": "Do",
+   "world": "Clear the air",
+   "item": "One thing you can count on",
+   "why": "Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"
+  },
+  {
+   "type": "Do",
+   "world": "Clear the air",
+   "item": "Do my small wish this week",
+   "why": "Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"
+  },
+  {
+   "type": "Do",
+   "world": "Clear the air",
+   "item": "Repair walk, 20 minutes",
+   "why": "Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"
+  },
+  {
+   "type": "Do",
+   "world": "Clear the air",
+   "item": "Our cool-down plan",
+   "why": "Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"
+  },
+  {
+   "type": "Do",
+   "world": "Clear the air",
+   "item": "10-minute listening swap",
+   "why": "Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"
+  },
+  {
+   "type": "Quiz",
+   "world": "Clear the air",
+   "item": "All 20 quizzes",
+   "why": "All cards are High priority: waiting for the doctor's final pass"
+  }
+ ]
+}

@@ -1,0 +1,52 @@
+PASS 1a admin/me as admin
+PASS 1b non-staff gets 403 on admin/me
+PASS 1c clinician 403 INSUFFICIENT_ROLE on admin-only route :: 403 INSUFFICIENT_ROLE
+PASS 1d clinician 200 on shared route (safety)
+PASS 1e refresh rotates the token pair
+PASS 1f reusing an old refresh token is refused :: 401 REFRESH_REUSED
+  (sign-in rate limit, waiting 60 s)
+PASS 1g refresh after logout is refused :: 401 REFRESH_REUSED
+PASS 2a seeded item is not a clinician sign-off :: Seeded from the Release 1 bundle, not a sign-off in this system
+PASS 2b admin saves a draft with expectedRev :: 200
+PASS 2c admin cannot approve (clinician only)
+PASS 2d clinician approves the reviewed revision :: 200 v2
+PASS 2e app feed serves the approved title :: My perfect day (mw1tf8hm)
+PASS 2f app feed carries no review fields
+PASS 3a AI-written Do steps flagged needsReview :: ["steps"]
+PASS 3b held title is detected (heldMatch) :: 201 {"reasons":[{"field":"title","value":"Repair walk, 20 minutes","held":{"type":"Do","world":"Clear the air","item":"Repair walk, 20 minutes","why":"Blocked: unlocked by Clear the air quizzes, which wait for the doctor's final pass"}}]}
+PASS 3c approving held content without acknowledgement is refused :: 409 HELD_CONTENT
+PASS 3d unpublishing never-approved content is refused :: 409 NOT_PUBLISHED
+PASS 3e held draft never reaches the app
+PASS 3f rollback to the seed keeps seeded approver and restores review flags state :: 200 v3 seeded=true
+PASS 4a second editor with a stale rev gets 409 CONTENT_CONFLICT :: 200/409
+PASS 4b clinician cannot approve a draft that changed after they opened it :: 409 CONTENT_CONFLICT
+PASS 5a suspend a test account
+PASS 5b suspended account gets 403 ACCOUNT_SUSPENDED :: 403 ACCOUNT_SUSPENDED
+PASS 5c unsuspend
+PASS 5d grant Plus is labelled admin_grant :: 200 admin_grant
+PASS 5e self suspend refused :: 409 SELF_ACTION
+PASS 5f delete with wrong email refused :: 400 CONFIRM_MISMATCH
+PASS 5g audit has suspend, unsuspend, plus grant :: user.plus_grant,user.unsuspend,user.suspend
+PASS 6a signal accepted, text rejected :: 202/400
+PASS 6b server-side surface filter
+PASS 6c flag carries no text field
+PASS 6d plain user 403 on safety log
+PASS 7a GET one ticket by id :: 200
+PASS 7b unknown ticket 404 TICKET_NOT_FOUND
+PASS 7c closing a ticket is audited :: support.ticket_status support_ticket:6aeae3a0e98346f6f9ad49c7
+PASS 8a no API keys in settings response
+PASS 8b AI settings save, stale save gets 409 SETTINGS_CONFLICT :: 200/409
+PASS 8c provider without key refused :: 400 PROVIDER_NOT_CONFIGURED
+PASS 8d AI settings rollback :: 200 
+PASS 8e test console says fallback when AI is off :: fallback
+PASS 9a webhook created, secret shown once
+PASS 9b ping and crisis.alert delivered with valid signatures :: [{"ev":"ping","ok":true},{"ev":"crisis.alert","ok":true}]
+PASS 9c server refuses a non-http webhook URL :: 400 WEBHOOK_URL_INVALID
+PASS 9d n8n action with scoped key works :: 200 
+PASS 9e wrong scope refused :: 403 API_KEY_SCOPE
+PASS 9f n8n cannot suspend staff :: 409 STAFF_ACCOUNT
+PASS 9g revoked key refused :: 401 API_KEY_INVALID
+PASS 10a CORS preflight allows the panel origin and headers :: 204 authorization,content-type,x-request-id,idempotency-key
+PASS 10b CORS refuses another origin
+
+49/49 passed

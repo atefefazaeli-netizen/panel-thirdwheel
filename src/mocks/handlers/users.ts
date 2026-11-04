@@ -1,6 +1,6 @@
 // ADMIN_API.md › Users & couples (admin only).
 import { http, HttpResponse } from 'msw';
-import type { AdminUserDetail, AdminUserRow } from '@/features/users/api/types';
+import type { AdminSubscriptionView, AdminUserDetail, AdminUserRow, PlusSource } from '@/features/users/api/types';
 import type { StaffUser } from '@/stores/session';
 import type { MockUser } from '../data/users';
 import { db, recordAudit } from '../db';
@@ -48,6 +48,30 @@ function summaries(userId: string): Pick<AdminUserDetail, 'safety' | 'support'> 
   };
 }
 
+/**
+ * The admin Plus view with `source` and `verification` (ADMIN_API.md › Users): store plans in the
+ * mock are "bought" with mock receipts, like the API's development receipt verifier.
+ */
+export function subscriptionView(u: MockUser): AdminSubscriptionView {
+  const s = u.subscription;
+  const now = Date.now();
+  const grant = !!s.grant && Date.parse(s.grant.until) > now;
+  const ownStore = !!s.renewsAt && Date.parse(s.renewsAt) > now && s.state !== 'paid_by_partner' && s.state !== 'free';
+  const partner = u.couple ? db().users.get(u.couple.partnerId) : null;
+  const partnerStore =
+    !!partner?.subscription.renewsAt &&
+    Date.parse(partner.subscription.renewsAt) > now &&
+    (partner.subscription.state === 'plus' ||
+      partner.subscription.state === 'payment_problem' ||
+      partner.subscription.state === 'cancelled');
+  let source: PlusSource = 'none';
+  let storeBacked = false;
+  if (ownStore && (s.state !== 'cancelled' || !grant)) [source, storeBacked] = ['store', true];
+  else if (grant) source = 'admin_grant';
+  else if (s.state === 'paid_by_partner') [source, storeBacked] = ['partner', partnerStore];
+  return { ...s, source, verification: storeBacked ? 'mock' : null };
+}
+
 const detail = (u: MockUser): AdminUserDetail => {
   const partner = u.couple ? db().users.get(u.couple.partnerId) : null;
   return {
@@ -61,8 +85,9 @@ const detail = (u: MockUser): AdminUserDetail => {
             partner: { userId: partner.account.userId, name: partner.name, email: partner.account.email },
           }
         : null,
-    subscription: u.subscription,
+    subscription: subscriptionView(u),
     ...summaries(u.account.userId),
+    unavailable: [],
   };
 };
 
@@ -240,7 +265,7 @@ export const usersHandlers = [
         until: u.subscription.grant?.until,
         note: u.subscription.grant?.note ?? null,
       });
-      return HttpResponse.json(u.subscription);
+      return HttpResponse.json(subscriptionView(u));
     }),
   ),
 
@@ -249,7 +274,7 @@ export const usersHandlers = [
       u.subscription = { ...u.subscription, grant: null };
       syncPlus(u);
       recordAudit(me, 'user.plus_revoke', `user:${u.account.userId}`);
-      return HttpResponse.json(u.subscription);
+      return HttpResponse.json(subscriptionView(u));
     }),
   ),
 

@@ -31,6 +31,19 @@ const MUTATING: ReadonlySet<Method> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']
 
 type SessionEndReason = 'refresh_failed' | 'suspended' | 'signed_out';
 const sessionEndListeners = new Set<(reason: SessionEndReason) => void>();
+const roleRefusedListeners = new Set<() => void>();
+
+/**
+ * Called when the API refuses a call for the role (403 INSUFFICIENT_ROLE). Roles follow
+ * ADMIN_EMAILS / CLINICIAN_EMAILS on every request, so the roles the panel loaded at sign-in may
+ * be out of date: the session re-reads admin/me and the role gates follow.
+ */
+export function onRoleRefused(fn: () => void): () => void {
+  roleRefusedListeners.add(fn);
+  return () => {
+    roleRefusedListeners.delete(fn);
+  };
+}
 
 /** Called when the session ends (refresh refused, account suspended, sign out). */
 export function onSessionEnd(fn: (reason: SessionEndReason) => void): () => void {
@@ -76,6 +89,8 @@ interface RawResult {
   status: number;
   body: unknown;
   requestId: string | null;
+  /** `Retry-After` (seconds) on a 429; readable cross-origin because the API exposes it. */
+  retryAfter?: number | null;
 }
 
 async function send(
@@ -130,7 +145,13 @@ async function send(
         parsed = { message: text.slice(0, 200) };
       }
     }
-    return { status: res.status, body: parsed, requestId: echoed };
+    const ra = res.headers.get('retry-after');
+    return {
+      status: res.status,
+      body: parsed,
+      requestId: echoed,
+      retryAfter: ra != null && ra !== '' ? Number(ra) : null,
+    };
   } finally {
     clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onAbort);
@@ -139,7 +160,12 @@ async function send(
 
 function httpError(r: RawResult): ApiError {
   const body = r.body && typeof r.body === 'object' ? (r.body as ApiErrorBody) : null;
-  return new ApiError('http', { status: r.status, body, requestId: r.requestId });
+  return new ApiError('http', {
+    status: r.status,
+    body,
+    requestId: r.requestId,
+    retryAfterSeconds: r.retryAfter ?? null,
+  });
 }
 
 /* ---------- Refresh (single flight) ---------- */
@@ -205,8 +231,18 @@ export async function request<T>(method: Method, path: string, opts: RequestOpti
     }
   }
 
-  if (auth && r.status === 403 && (r.body as ApiErrorBody | undefined)?.code === 'ACCOUNT_SUSPENDED') {
+  const code403 = r.status === 403 ? (r.body as ApiErrorBody | undefined)?.code : undefined;
+  if (auth && code403 === 'ACCOUNT_SUSPENDED') {
     endSession('suspended');
+  }
+  if (auth && code403 === 'INSUFFICIENT_ROLE') {
+    roleRefusedListeners.forEach((fn) => {
+      try {
+        fn();
+      } catch {
+        // A listener must not stop the others.
+      }
+    });
   }
   if (r.status < 200 || r.status >= 300) throw httpError(r);
   return r.body as T;
