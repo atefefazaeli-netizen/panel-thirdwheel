@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { optionalEnum, optionalString, pageSearch } from '@/lib/search';
+import { optionalBool, optionalEnum, optionalString, pageSearch } from '@/lib/search';
 
 export const contentSearchSchema = z.object({
   pillar: optionalEnum(['quiz', 'play', 'do']),
@@ -8,6 +8,8 @@ export const contentSearchSchema = z.object({
   category: optionalString,
   type: optionalString,
   only: optionalEnum(['spicy', 'kids', 'ld', 'opt-in']),
+  /** "true": only items whose live content needs clinical review (seeded provenance). */
+  needsReview: optionalBool,
   ...pageSearch,
 });
 export type ContentSearch = z.infer<typeof contentSearchSchema>;

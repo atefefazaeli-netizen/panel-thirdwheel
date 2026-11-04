@@ -10,6 +10,7 @@ import {
   submitDraft,
   unpublishItem,
   importDraft,
+  provenanceFromSeed,
   type Actor,
   type StoredChange,
   type StoredItem,
@@ -60,6 +61,8 @@ export function seedContent(): ContentState {
       liveRevision: 0,
       draft: null,
       retired: false,
+      rev: 0,
+      provenance: provenanceFromSeed(s.id),
       createdAt: seededAt,
       updatedAt: seededAt,
     });
@@ -88,7 +91,8 @@ export function seedContent(): ContentState {
   }
 
   const apply = (t: Transition) => {
-    state.items.set(t.item.id, t.item);
+    const prev = state.items.get(t.item.id);
+    state.items.set(t.item.id, prev ? { ...t.item, rev: prev.rev + 1 } : t.item);
     state.changes.push({ ...t.change, itemId: t.item.id });
     if (t.version) state.versions.push(t.version);
     if (t.publishes) state.revision += 1;

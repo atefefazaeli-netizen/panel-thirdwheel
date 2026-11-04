@@ -23,7 +23,13 @@ export function ContentListPage() {
   const qc = useQueryClient();
   const page = search.page ?? 1;
   const limit = search.limit ?? 20;
-  const list = useContentList({ ...search, page, limit });
+  const { needsReview, ...rest } = search;
+  const list = useContentList({
+    ...rest,
+    ...(needsReview === undefined ? {} : { needsReview: needsReview ? 'true' : 'false' }),
+    page,
+    limit,
+  });
   const facets = useContentFacets();
 
   const set = (patch: Partial<ContentSearch>, resetPage = true) =>
@@ -55,6 +61,16 @@ export function ContentListPage() {
       options: (facets.data?.types ?? []).map((t) => ({ value: t, label: t })),
     },
     {
+      id: 'needsReview',
+      title: 'Clinical review',
+      value: search.needsReview === undefined ? [] : [String(search.needsReview)],
+      onChange: (v) => set({ needsReview: v[0] === undefined ? undefined : v[0] === 'true' }),
+      options: [
+        { value: 'true', label: 'Needs clinical review' },
+        { value: 'false', label: 'No review flags' },
+      ],
+    },
+    {
       id: 'only',
       title: 'Only',
       value: search.only ? [search.only] : [],
@@ -69,7 +85,7 @@ export function ContentListPage() {
       toast.info('None of the selected items has a draft to submit.');
       return;
     }
-    const results = await Promise.allSettled(ready.map((r) => contentApi.submit(r.id)));
+    const results = await Promise.allSettled(ready.map((r) => contentApi.submit(r.id, r.rev)));
     const failed = results.filter((r) => r.status === 'rejected');
     void qc.invalidateQueries({ queryKey: contentKeys.all });
     clear();
@@ -84,7 +100,7 @@ export function ContentListPage() {
     <>
       <PageHeader
         title="Content"
-        description="Release 1 quizzes, games and Do cards. Every change is a draft until a clinician approves it."
+        description="Release 1 quizzes, games and Do cards. Every change is a draft until a clinician approves it. Seeded content is not a clinician sign-off: filter Clinical review to see what still needs one."
         actions={
           <RoleGate allow="admin">
             <Button variant="outline" asChild>

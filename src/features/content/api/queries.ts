@@ -58,21 +58,45 @@ function useItemWrite<V>(fn: (v: V) => Promise<ContentItem>, opts: { silent?: bo
 
 export const useCreateContent = () =>
   useItemWrite((input: CreateContentInput) => contentApi.create(input), { silent: true });
+// Writes carry the `rev` the screen last read; a 409 CONTENT_CONFLICT is shown inline (silent).
 export const useSaveDraft = (id: string) =>
-  useItemWrite((snapshot: ContentSnapshot) => contentApi.saveDraft(id, snapshot), { silent: true });
-export const useDiscardDraft = (id: string) => useItemWrite(() => contentApi.discardDraft(id));
-export const useSubmitContent = (id: string) => useItemWrite((note?: string) => contentApi.submit(id, note));
-export const useApproveContent = (id: string) => useItemWrite((note?: string) => contentApi.approve(id, note));
-export const useRequestChanges = (id: string) => useItemWrite((note: string) => contentApi.requestChanges(id, note));
-export const useUnpublishContent = (id: string) => useItemWrite(() => contentApi.unpublish(id));
-export const useRestoreContent = (id: string) => useItemWrite(() => contentApi.restore(id));
+  useItemWrite((v: { snapshot: ContentSnapshot; rev: number }) => contentApi.saveDraft(id, v.snapshot, v.rev), {
+    silent: true,
+  });
+export const useDiscardDraft = (id: string) =>
+  useItemWrite((v: { rev: number }) => contentApi.discardDraft(id, v.rev), { silent: true });
+export const useSubmitContent = (id: string) =>
+  useItemWrite((v: { rev: number; note?: string }) => contentApi.submit(id, v.rev, v.note), { silent: true });
+export const useApproveContent = (id: string) =>
+  useItemWrite(
+    (v: { rev: number; note?: string; acknowledgeHeld?: boolean }) =>
+      contentApi.approve(id, v.rev, { note: v.note, acknowledgeHeld: v.acknowledgeHeld }),
+    { silent: true },
+  );
+export const useRequestChanges = (id: string) =>
+  useItemWrite((v: { rev: number; note: string }) => contentApi.requestChanges(id, v.rev, v.note), { silent: true });
+export const useUnpublishContent = (id: string) =>
+  useItemWrite((v: { rev: number }) => contentApi.unpublish(id, v.rev), { silent: true });
+export const useRestoreContent = (id: string) =>
+  useItemWrite((v: { rev: number }) => contentApi.restore(id, v.rev), { silent: true });
 export const useRollbackContent = (id: string) =>
-  useItemWrite((v: { version: number; note?: string }) => contentApi.rollback(id, v.version, v.note));
+  useItemWrite(
+    (v: { version: number; rev: number; note?: string }) => contentApi.rollback(id, v.version, v.rev, v.note),
+    { silent: true },
+  );
 
 export function useImportContent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { items: ContentImportItem[]; note?: string }) => contentApi.import(v.items, v.note),
+    mutationFn: (v: { items: ContentImportItem[]; note?: string }) => contentApi.import(v.items, { note: v.note }),
     onSuccess: () => qc.invalidateQueries({ queryKey: contentKeys.all }),
+  });
+}
+
+/** Import dry run: the server checks every item (validation, existing ids, held list) and writes nothing. */
+export function useImportCheck() {
+  return useMutation({
+    mutationFn: (items: ContentImportItem[]) => contentApi.import(items, { dryRun: true }),
+    meta: { silent: true },
   });
 }

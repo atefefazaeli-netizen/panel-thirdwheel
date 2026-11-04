@@ -1,23 +1,33 @@
 // ADMIN_API.md › Content: panel routes (read: admin or clinician; writes as noted) and the app's
 // manifest / published routes. Rules come from ../content-domain (a port of the backend domain).
 import { http, HttpResponse } from 'msw';
-import type { ContentImportResult, ContentSummary } from '@/features/content/api/types';
+import type {
+  ContentImportItemResult,
+  ContentImportResult,
+  ContentItem,
+  ContentSummary,
+  ContentVersion,
+} from '@/features/content/api/types';
 import type { StaffUser } from '@/stores/session';
 import {
   approveDraft,
+  checkRev,
   ContentRuleError,
   createItem,
   currentSnapshot,
   discardDraft,
+  heldMatchOf,
   importDraft,
   requestChanges,
   restoreItem,
   rollbackTo,
   saveDraft,
+  SEEDED_LABEL,
   submitDraft,
   unpublishItem,
   type Actor,
   type StoredItem,
+  type StoredVersion,
   type Transition,
 } from '../content-domain';
 import { db, recordAudit } from '../db';
@@ -42,12 +52,27 @@ function summary(i: StoredItem): ContentSummary {
     liveVersion: i.liveVersion,
     draftState: i.draft?.state ?? null,
     retired: i.retired,
+    rev: i.rev,
+    needsReview: !!i.provenance?.needsReview.length,
+    held: !!heldMatchOf(c),
     updatedAt: i.updatedAt,
   };
 }
 
-/** The API view: the stored item without the server-only revision field. */
-const view = ({ liveRevision: _r, ...rest }: StoredItem) => rest;
+/** The API view: the stored item without the server-only revision field, plus computed fields. */
+const view = ({ liveRevision: _r, ...rest }: StoredItem): ContentItem => ({
+  ...rest,
+  liveSeeded: rest.liveApprovedBy === 'workbook',
+  liveApprovalLabel: rest.liveApprovedBy === 'workbook' ? SEEDED_LABEL : null,
+  needsReview: !!rest.provenance?.needsReview.length,
+  heldMatch: heldMatchOf(currentSnapshot(rest)?.catalog),
+});
+
+const versionView = ({ itemId: _i, snapshot: _s, ...v }: StoredVersion): ContentVersion => ({
+  ...v,
+  seeded: v.approvedBy === 'workbook',
+  approvalLabel: v.approvedBy === 'workbook' ? SEEDED_LABEL : null,
+});
 
 function ruleError(e: unknown) {
   if (e instanceof ContentRuleError)
@@ -60,7 +85,7 @@ function find(id: string | readonly string[] | undefined) {
 }
 
 /** Applies a transition: store it, log it, publish when live changed, audit the write. */
-function commit(me: StaffUser, action: string, t: Transition, meta: Record<string, unknown> = {}) {
+function commit(me: StaffUser, action: string, t: Transition, meta: Record<string, unknown> = {}, bump = true) {
   const c = db().content;
   let item = t.item;
   if (t.publishes) {
@@ -76,8 +101,11 @@ function commit(me: StaffUser, action: string, t: Transition, meta: Record<strin
       action: t.publishes,
       by: me.userId,
       at: item.updatedAt,
+      retired: item.retired,
     });
   }
+  // Every write bumps rev, like the server's conditional update (a new item starts at 0).
+  if (bump) item = { ...item, rev: item.rev + 1 };
   c.items.set(item.id, item);
   c.changes.push({ ...t.change, itemId: item.id });
   if (t.version) c.versions.push(t.version);
@@ -96,8 +124,17 @@ function step(
     const item = find(id);
     if (!item) return apiError(404, 'Content not found', 'CONTENT_NOT_FOUND');
     const body = await readJson(request);
+    const query = new URL(request.url).searchParams.get('expectedRev');
     try {
-      return commit(me, action, fn(item, me, body));
+      // Every panel write on an item carries the rev it last read (DELETE: ?expectedRev=).
+      checkRev(item, request.method === 'DELETE' ? (query === null ? undefined : Number(query)) : body.expectedRev);
+      const t = fn(item, me, body);
+      const m = t.change.meta;
+      return commit(me, action, t, {
+        ...(m?.selfApproved ? { selfApproved: true } : {}),
+        ...(m?.acknowledgedHeld ? { acknowledgedHeld: true } : {}),
+        ...(m?.clearedReview ? { clearedReview: m.clearedReview } : {}),
+      });
     } catch (e) {
       return ruleError(e);
     }
@@ -120,6 +157,7 @@ export const contentHandlers = [
           if (q.get('category') && s.category !== q.get('category')) return false;
           if (q.get('type') && s.type !== q.get('type')) return false;
           if (q.get('only') && s.only !== q.get('only')) return false;
+          if (q.get('needsReview') && String(s.needsReview) !== q.get('needsReview')) return false;
           if (state === 'retired' && !i.retired) return false;
           if (state === 'live' && (i.retired || i.liveVersion === 0)) return false;
           if (state && state !== 'retired' && state !== 'live' && (i.retired || i.draft?.state !== state)) return false;
@@ -154,20 +192,26 @@ export const contentHandlers = [
 
   http.post(p('admin/content/import'), ({ request }) =>
     guard(request, 'admin', async (me) => {
-      const body = await readJson<{ items?: unknown; note?: string }>(request);
+      const body = await readJson<{ items?: unknown; note?: string; dryRun?: boolean }>(request);
       if (!Array.isArray(body.items)) return badRequest('items must be an array');
       if (body.items.length > 200) return apiError(400, 'At most 200 items in one import.', 'INVALID_CONTENT');
-      const out: ContentImportResult = { created: [], updated: [], rejected: [] };
+      const dryRun = body.dryRun === true;
+      const out: ContentImportResult = { created: [], updated: [], rejected: [], results: [], dryRun };
+      const results: ContentImportItemResult[] = [];
+      const reject = (id: string, reason: string, details?: string[]) => {
+        out.rejected.push({ id, reason: details?.length ? `${reason} ${details.join('; ')}` : reason });
+        results.push({ id, status: 'rejected', reason, ...(details?.length ? { details } : {}) });
+      };
       const seen = new Set<string>();
       const c = db().content;
       for (const input of body.items as Record<string, unknown>[]) {
         if (!input || typeof input !== 'object' || Array.isArray(input)) {
-          out.rejected.push({ id: '', reason: 'Not an item' });
+          reject('', 'Not an item');
           continue;
         }
         const id = typeof input.id === 'string' ? input.id : '';
         if (seen.has(id)) {
-          out.rejected.push({ id, reason: 'Listed twice in this import' });
+          reject(id, 'Listed twice in this import');
           continue;
         }
         seen.add(id);
@@ -181,20 +225,33 @@ export const contentHandlers = [
             nowIso(),
             'panel',
           );
-          c.items.set(id, t.item);
-          c.changes.push({ ...t.change, itemId: id });
+          const held = heldMatchOf(t.item.draft?.snapshot.catalog)?.reasons.map(
+            (r) => `${r.field} matches held ${r.held.type} "${r.held.item}" (${r.held.why})`,
+          );
+          if (!dryRun) {
+            c.items.set(id, { ...t.item, rev: existing ? existing.rev + 1 : 0 });
+            c.changes.push({ ...t.change, itemId: id });
+          }
           (existing ? out.updated : out.created).push(id);
+          results.push({
+            id,
+            status: existing ? 'updated' : 'created',
+            ...(existing ? { replacedDraft: existing.draft?.state ?? null } : {}),
+            ...(held ? { held } : {}),
+          });
         } catch (e) {
           if (!(e instanceof ContentRuleError)) throw e;
-          out.rejected.push({ id, reason: e.details?.length ? `${e.message} ${e.details.join('; ')}` : e.message });
+          reject(id, e.message, e.details);
         }
       }
-      recordAudit(me, 'content.import', 'content:import', {
-        created: out.created.length,
-        updated: out.updated.length,
-        rejected: out.rejected.length,
-        source: 'panel',
-      });
+      out.results = results;
+      if (!dryRun)
+        recordAudit(me, 'content.import', 'content:import', {
+          created: out.created.length,
+          updated: out.updated.length,
+          rejected: out.rejected.length,
+          source: 'panel',
+        });
       return HttpResponse.json(out);
     }),
   ),
@@ -228,7 +285,7 @@ export const contentHandlers = [
           actorOf(me),
           nowIso(),
         );
-        const res = commit(me, 'content.create', t);
+        const res = commit(me, 'content.create', t, {}, false);
         return new HttpResponse(res.body, { status: 201, headers: res.headers });
       } catch (e) {
         return ruleError(e);
@@ -268,7 +325,7 @@ export const contentHandlers = [
       request,
       'clinician',
       'content.approve',
-      (i, me, b) => approveDraft(i, note(b), actorOf(me), nowIso()),
+      (i, me, b) => approveDraft(i, note(b), actorOf(me), nowIso(), b.acknowledgeHeld === true),
       String(params.id),
     ),
   ),
@@ -294,7 +351,7 @@ export const contentHandlers = [
       const rows = db()
         .content.versions.filter((v) => v.itemId === params.id)
         .sort((a, b) => b.version - a.version)
-        .map(({ itemId: _i, snapshot: _s, ...v }) => v);
+        .map(versionView);
       return HttpResponse.json(rows);
     }),
   ),
@@ -303,8 +360,7 @@ export const contentHandlers = [
     guard(request, 'staff', () => {
       const v = db().content.versions.find((x) => x.itemId === params.id && x.version === Number(params.version));
       if (!v) return apiError(404, 'No such version.', 'VERSION_NOT_FOUND');
-      const { itemId: _i, ...rest } = v;
-      return HttpResponse.json(rest);
+      return HttpResponse.json({ ...versionView(v), snapshot: v.snapshot });
     }),
   ),
 
