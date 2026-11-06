@@ -1,6 +1,7 @@
 // Mock safety flags: metadata only (kind, level, surface, helpline shown, counts, dates, staff notes).
 import type { SafetyFlag, SafetyKind, SafetyLevel, SafetySurface } from '@/features/safety/api/types';
 import { daysAgo, oid } from '../utils';
+import { staffId } from './staff';
 import { uid } from './users';
 
 export const LEVEL_OF: Record<SafetyKind, SafetyLevel> = { crisis: 'high', safety: 'medium', heat: 'low' };
@@ -10,8 +11,8 @@ export interface SafetyState {
 }
 
 export function seedSafety(emailOf: (userId: string) => string | null): SafetyState {
-  const lead = uid('lead');
-  const doctor = uid('doctor');
+  const lead = `staff:${staffId('safety')}`;
+  const doctor = `staff:${staffId('reviewer')}`;
   const rows: [string, SafetyKind, SafetySurface, boolean, number, SafetyFlag['status'], number, number][] = [
     // user, kind, surface, helpline, count, status, firstAt (hours ago), lastAt (hours ago)
     ['priya', 'crisis', 'third-ear', true, 1, 'open', 2, 2],
@@ -48,7 +49,8 @@ export function seedSafety(emailOf: (userId: string) => string | null): SafetySt
       notes.push({
         id: oid(`note:${i}:a`),
         by: doctor,
-        byEmail: 'dr.noor@thirdwheel.app',
+        byEmail: null,
+        byName: 'Dr. Noor Rahman',
         text: 'Helpline card was shown. No further action needed.',
         at: hoursAgo(last - 1),
       });
@@ -56,14 +58,16 @@ export function seedSafety(emailOf: (userId: string) => string | null): SafetySt
       notes.push({
         id: oid(`note:${i}:b`),
         by: lead,
-        byEmail: 'lead@thirdwheel.app',
+        byEmail: null,
+        byName: 'Dana Fares',
         text: 'Repeated crisis checks this week. Escalated to the on-call clinician.',
         at: hoursAgo(last - 0.5),
       });
       notes.push({
         id: oid(`note:${i}:c`),
         by: doctor,
-        byEmail: 'dr.noor@thirdwheel.app',
+        byEmail: null,
+        byName: 'Dr. Noor Rahman',
         text: 'Seen. Following the safeguarding runbook.',
         at: hoursAgo(last - 2),
       });

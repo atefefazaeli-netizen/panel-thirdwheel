@@ -1,29 +1,87 @@
-// Bearer-token checks for the mock handlers, mirroring the API's guards: 401 without a valid
-// access token, 403 when the role does not allow the route.
-import type { StaffUser } from '@/stores/session';
+// Staff session checks for the mock handlers, mirroring the API's guards (STAFF_API.md §1, §2, §4):
+// 401 STAFF_SESSION_REQUIRED without a live session, 403 SESSION_RESTRICTED for a restricted
+// session outside its setup routes, 403 CSRF_FAILED for a write without the session's
+// X-CSRF-Token, 403 INSUFFICIENT_PERMISSION when no role grants the permission (deny by default).
+import type { Permission } from '@/lib/permissions';
+import { accountPermissions, type StaffAccount, type StaffSession } from './data/staff';
 import { db } from './db';
 import { apiError } from './utils';
 
-export type Need = 'staff' | 'admin' | 'clinician' | 'user';
-
-export function currentUser(request: Request): StaffUser | null {
-  const header = request.headers.get('authorization') ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  const hit = db().auth.access.get(token);
-  if (!hit || hit.exp < Date.now()) return null;
-  return hit.user;
+/** The signed-in staff member as handlers see it (actor ids are `staff:<id>`, STAFF_API.md §4). */
+export interface MockActor {
+  userId: string;
+  /** Staff have no email; kept for the older view fields (always null now). */
+  email: null;
+  name: string;
+  staffId: string;
+  roles: string[];
+  permissions: Permission[];
+  account: StaffAccount;
+  session: StaffSession;
 }
 
-/** Runs `fn` with the signed-in staff member when the role allows it, else answers 401 / 403. */
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+/** Idle session lifetime in the mock (STAFF_SESSION_IDLE_MINUTES default). */
+const IDLE_MS = 60 * 60_000;
+
+export function currentSession(): { session: StaffSession; account: StaffAccount } | null {
+  const s = db().staff;
+  const sid = s.jar;
+  const session = sid ? s.sessions.get(sid) : undefined;
+  if (!session) return null;
+  if (Date.now() - Date.parse(session.lastSeenAt) > IDLE_MS) {
+    s.sessions.delete(session.id);
+    return null;
+  }
+  const account = s.accounts.find((a) => a.id === session.staffId);
+  if (!account || account.disabled) return null;
+  session.lastSeenAt = new Date().toISOString();
+  return { session, account };
+}
+
+export function actorOf(account: StaffAccount, session: StaffSession): MockActor {
+  return {
+    userId: `staff:${account.id}`,
+    email: null,
+    name: account.displayName,
+    staffId: account.id,
+    roles: account.roles,
+    permissions: accountPermissions(account, db().staff.customRoles),
+    account,
+    session,
+  };
+}
+
+function csrfOk(request: Request, session: StaffSession): boolean {
+  return request.headers.get('x-csrf-token') === session.csrfToken;
+}
+
+/**
+ * Runs `fn` for a signed-in staff member holding the permission (any of a list). `'session'` only
+ * needs an unrestricted session; `{ restricted: true }` also lets a restricted session through
+ * (the setup routes).
+ */
 export async function guard(
   request: Request,
-  need: Need,
-  fn: (me: StaffUser) => Response | Promise<Response>,
+  need: Permission | Permission[] | 'session',
+  fn: (me: MockActor) => Response | Promise<Response>,
+  opts: { restricted?: boolean } = {},
 ): Promise<Response> {
-  const me = currentUser(request);
-  if (!me) return apiError(401, 'Unauthorized', 'UNAUTHORIZED');
-  const isStaff = me.roles.includes('admin') || me.roles.includes('clinician');
-  const ok = need === 'user' || (need === 'staff' ? isStaff : me.roles.includes(need));
-  if (!ok) return apiError(403, 'Insufficient role', 'INSUFFICIENT_ROLE');
+  const hit = currentSession();
+  if (!hit) return apiError(401, 'Sign in to the panel.', 'STAFF_SESSION_REQUIRED');
+  const { session, account } = hit;
+  if (MUTATING.has(request.method) && !csrfOk(request, session))
+    return apiError(403, 'CSRF check failed.', 'CSRF_FAILED');
+  if (session.restricted && !opts.restricted)
+    return apiError(403, 'Finish setting up your account first.', 'SESSION_RESTRICTED');
+  const me = actorOf(account, session);
+  if (need !== 'session') {
+    const list = Array.isArray(need) ? need : [need];
+    if (!list.some((p) => me.permissions.includes(p)))
+      return apiError(403, 'Your roles do not allow this.', 'INSUFFICIENT_PERMISSION');
+  }
   return fn(me);
 }
+
+/** Holds the permission (for parts of an answer that need an extra one, like a user's safety data). */
+export const holds = (me: MockActor, p: Permission) => me.permissions.includes(p);

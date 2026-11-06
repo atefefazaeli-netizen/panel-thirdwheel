@@ -3,23 +3,23 @@ import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useSidebarStore } from '@/stores/sidebar';
-import type { StaffUser } from '@/stores/session';
+import type { StaffMe } from '@/stores/session';
 import { AppSidebar, type NavBadges } from './app-sidebar';
 import { Breadcrumbs } from './breadcrumbs';
 import { ThemeToggle } from './theme-toggle';
 import { UserMenu } from './user-menu';
 
 export interface AppShellProps {
-  user: StaffUser | null;
+  staff: StaffMe | null;
   badges?: NavBadges;
   onSignOut: () => void;
-  /** Shown under the top bar on every page (mock API notice). */
+  /** Shown above the top bar on every page (the development mock API notice). */
   banner?: React.ReactNode;
   children: React.ReactNode;
 }
 
 /** Sidebar + top bar (breadcrumbs, theme, account) + page content. */
-export function AppShell({ user, badges, onSignOut, banner, children }: AppShellProps) {
+export function AppShell({ staff, badges, onSignOut, banner, children }: AppShellProps) {
   const storedOpen = useSidebarStore((s) => s.open);
   const setStoredOpen = useSidebarStore((s) => s.setOpen);
   // Tablets start with the icon rail so tables get the width; the saved choice is for desktop.
@@ -38,9 +38,9 @@ export function AppShell({ user, badges, onSignOut, banner, children }: AppShell
       >
         Skip to content
       </a>
-      <AppSidebar user={user} badges={badges} />
+      <AppSidebar staff={staff} badges={badges} />
       <SidebarInset>
-        {/* The banner (demo data) sticks with the top bar, so it stays in view on every page. */}
+        {/* The banner (development mocks only) sticks with the top bar, so it stays in view. */}
         <div className="sticky top-0 z-20">
           {banner}
           <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4">
@@ -49,7 +49,7 @@ export function AppShell({ user, badges, onSignOut, banner, children }: AppShell
             <Breadcrumbs />
             <div className="ml-auto flex items-center gap-1">
               <ThemeToggle />
-              {user && <UserMenu user={user} onSignOut={onSignOut} />}
+              {staff && <UserMenu staff={staff} onSignOut={onSignOut} />}
             </div>
           </header>
         </div>

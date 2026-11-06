@@ -1,9 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router';
-import { ForbiddenState, PageHeader, RoleGate } from '@/components/shared';
-import { TriangleAlertIcon } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PageHeader, RequirePermission } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { env } from '@/config/env';
 import { cleanSearch } from '@/lib/search';
 import { ApiKeysTab } from '../components/api-keys-tab';
 import { DeliveriesTab } from '../components/deliveries-tab';
@@ -15,9 +12,9 @@ const route = getRouteApi('/_app/settings/integrations');
 
 export function IntegrationsPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="integrations" />}>
+    <RequirePermission perm="integrations.read" what="integrations">
       <Integrations />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 
@@ -37,16 +34,6 @@ function Integrations() {
         title="Integrations"
         description="Webhooks to n8n (crisis alerts, support tickets, content and plan changes) and API keys for n8n to call Thirdwheel."
       />
-      {env.useMocks && (
-        <Alert variant="destructive">
-          <TriangleAlertIcon />
-          <AlertTitle>Demo data: nothing here is real</AlertTitle>
-          <AlertDescription>
-            These webhooks never send anything and the delivery log is simulated. Secrets and API keys made here exist
-            only in this browser and do not work against the real API or in n8n.
-          </AlertDescription>
-        </Alert>
-      )}
       <Tabs
         value={tab}
         onValueChange={(t) => void navigate({ search: { tab: t as IntegrationsSearch['tab'] }, replace: true })}

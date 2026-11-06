@@ -3,7 +3,15 @@ import { KeyRoundIcon, PlusIcon } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { ConfirmDialog, EmptyState, ErrorState, FormFieldText, SecretReveal, StatusBadge } from '@/components/shared';
+import {
+  Can,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  FormFieldText,
+  SecretReveal,
+  StatusBadge,
+} from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -138,10 +146,12 @@ export function ApiKeysTab() {
         <p className="text-sm text-muted-foreground">
           Incoming keys for n8n actions. The server keeps only a hash; the key is shown once.
         </p>
-        <Button onClick={() => setCreating(true)}>
-          <PlusIcon />
-          New API key
-        </Button>
+        <Can perm="integrations.manage">
+          <Button onClick={() => setCreating(true)}>
+            <PlusIcon />
+            New API key
+          </Button>
+        </Can>
       </div>
       {keys.error ? (
         <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
@@ -191,9 +201,11 @@ export function ApiKeysTab() {
                     </TableCell>
                     <TableCell className="pr-4 text-right">
                       {!k.revokedAt && (
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setRevoking(k)}>
-                          Revoke
-                        </Button>
+                        <Can perm="integrations.manage">
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setRevoking(k)}>
+                            Revoke
+                          </Button>
+                        </Can>
                       )}
                     </TableCell>
                   </TableRow>

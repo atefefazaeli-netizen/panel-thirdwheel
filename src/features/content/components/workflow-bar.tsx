@@ -144,12 +144,18 @@ export function WorkflowBar({
           />
         )}
       </FormDialog>
-      <ApproveDialog item={item} userId={userId} open={dialog === 'approve'} onOpenChange={close} onApprove={onApprove} />
+      <ApproveDialog
+        item={item}
+        userId={userId}
+        open={dialog === 'approve'}
+        onOpenChange={close}
+        onApprove={onApprove}
+      />
       <FormDialog
         open={dialog === 'changes'}
         onOpenChange={close}
         title="Request changes"
-        description="The draft goes back to the admin with your note."
+        description="The draft goes back to the editor with your note."
         schema={requiredNote}
         defaultValues={{ note: '' }}
         submitLabel="Send back"

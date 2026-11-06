@@ -6,6 +6,8 @@ export interface AuditEntry {
   id: string;
   actor: string;
   actorEmail: string | null;
+  /** Staff display name (STAFF_API.md §8: actor `staff:<id>` plus `actorName` in views). */
+  actorName?: string | null;
   action: string;
   target: string;
   meta: Record<string, unknown> | null;

@@ -98,6 +98,8 @@ export interface ContentDraft {
   note: string | null;
   by: string;
   byEmail: string | null;
+  /** Staff display name (STAFF_API.md §4: actor ids are `staff:<id>` with a name). */
+  byName?: string | null;
   at: string;
   source: DraftSource;
 }
@@ -115,7 +117,14 @@ export interface ContentProvenance {
   flagged: ReviewNeed[];
   needsReview: ReviewNeed[];
   notes: string[];
-  clearedBy: { by: string; byEmail: string | null; at: string; version: number; via: string } | null;
+  clearedBy: {
+    by: string;
+    byEmail: string | null;
+    byName?: string | null;
+    at: string;
+    version: number;
+    via: string;
+  } | null;
 }
 
 export interface HeldEntry {
@@ -139,6 +148,7 @@ export interface ContentItem {
   livePublishedAt: string | null;
   liveApprovedBy: string | null;
   liveApprovedByEmail: string | null;
+  liveApprovedByName?: string | null;
   /** Live is the seeded bundle (approver id `workbook`): not a sign-off in this system. */
   liveSeeded: boolean;
   liveApprovalLabel: string | null;
@@ -184,10 +194,12 @@ export interface ContentVersion {
   publishedAt: string;
   approvedBy: string;
   approvedByEmail: string | null;
+  approvedByName?: string | null;
   action: VersionAction;
   note: string | null;
   by: string;
   byEmail: string | null;
+  byName?: string | null;
   from: number | null;
   /** The seeded bundle (approvedBy `workbook`): not a clinician sign-off in this system. */
   seeded: boolean;
@@ -215,6 +227,7 @@ export interface ContentChange {
   action: ChangeAction;
   by: string;
   byEmail: string | null;
+  byName?: string | null;
   note: string | null;
   at: string;
   meta: {

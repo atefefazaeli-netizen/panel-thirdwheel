@@ -14,6 +14,8 @@ export interface SafetyNote {
   id: string;
   by: string;
   byEmail: string | null;
+  /** Staff display name (actor ids are `staff:<id>`). */
+  byName?: string | null;
   text: string;
   at: string;
 }

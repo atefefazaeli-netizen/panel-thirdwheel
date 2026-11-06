@@ -3,7 +3,7 @@ import { InfoIcon, RefreshCwIcon, SaveIcon, TriangleAlertIcon, Undo2Icon } from 
 import * as React from 'react';
 import { useForm, useFormState } from 'react-hook-form';
 import { toast } from 'sonner';
-import { ErrorState, FormFieldText, PageHeader, RoleGate } from '@/components/shared';
+import { Can, ErrorState, FormFieldText, PageHeader } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,16 +13,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useRoles } from '@/stores/session';
+import { useCan } from '@/stores/session';
 import { isSettingsConflict, useAiHistory, useAiSettings, useSaveAiSettings } from '../api/queries';
 import type { AiSettingsView } from '../api/types';
 import { HistoryCard } from '../components/history-card';
 import { PromptsCard } from '../components/prompts-card';
 import { ModelCards, ProviderCard } from '../components/settings-cards';
 import { TestConsole } from '../components/test-console';
+import { MODE_LABEL } from '../lib/labels';
 import { aiSettingsSchema, toForm, toInput, type AiSettingsForm } from '../schemas/ai';
 
 export function AiEnginePage() {
+  // Settings need ai.read; an account with only ai.test gets the console alone.
+  const canRead = useCan('ai.read');
+  return canRead ? <SettingsPage /> : <ConsoleOnly />;
+}
+
+function ConsoleOnly() {
+  return (
+    <>
+      <PageHeader
+        title="AI engine"
+        description="Try messages against the live AI settings. Your role can't read or change them."
+      />
+      <div className="max-w-xl">
+        <TestConsole modes={Object.keys(MODE_LABEL)} dirty={false} canUseDraft={false} getDraft={() => null} />
+      </div>
+    </>
+  );
+}
+
+function SettingsPage() {
   const q = useAiSettings();
   if (q.error)
     return <ErrorState error={q.error} title="Could not load the AI settings" onRetry={() => void q.refetch()} />;
@@ -38,8 +59,7 @@ export function AiEnginePage() {
 }
 
 function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => void }) {
-  const { isAdmin } = useRoles();
-  const readOnly = !isAdmin;
+  const readOnly = !useCan('ai.edit');
   const schema = React.useMemo(() => aiSettingsSchema(view.keys), [view.keys]);
   const form = useForm<AiSettingsForm>({
     resolver: zodResolver(schema),
@@ -50,7 +70,7 @@ function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => vo
   const save = useSaveAiSettings();
   const c = view.current;
   const latest = useAiHistory(1).data?.items.find((h) => h.version === c.version);
-  const by = latest?.updatedByEmail ?? c.updatedBy;
+  const by = latest?.updatedByName ?? latest?.updatedByEmail ?? c.updatedBy;
   // Someone else saved while this form was open: the server refused ours (409 SETTINGS_CONFLICT).
   const [conflict, setConflict] = React.useState(false);
 
@@ -100,7 +120,9 @@ function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => vo
         <Alert>
           <InfoIcon />
           <AlertTitle>Read only</AlertTitle>
-          <AlertDescription>Clinicians can read the AI settings and prompts. Admins change them.</AlertDescription>
+          <AlertDescription>
+            Your role can read the AI settings and prompts. Changing them needs the AI edit permission.
+          </AlertDescription>
         </Alert>
       )}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -111,7 +133,7 @@ function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => vo
               <ModelCards view={view} readOnly={readOnly} />
               <PromptsCard view={view} readOnly={readOnly} />
             </fieldset>
-            <RoleGate allow="admin">
+            <Can perm="ai.edit">
               <Card
                 className={cn(
                   'py-3',
@@ -145,12 +167,12 @@ function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => vo
                   </div>
                 </CardContent>
               </Card>
-            </RoleGate>
+            </Can>
           </form>
           <HistoryCard currentVersion={c.version} />
         </div>
         <div className="flex flex-col gap-4 xl:sticky xl:top-20">
-          <RoleGate allow="admin">
+          <Can perm="ai.test">
             <TestConsole
               modes={view.modes}
               dirty={isDirty}
@@ -159,7 +181,7 @@ function Settings({ view, onReload }: { view: AiSettingsView; onReload: () => vo
                 return parsed.success ? toInput(parsed.data) : null;
               }}
             />
-          </RoleGate>
+          </Can>
         </div>
       </div>
     </Form>

@@ -3,7 +3,7 @@ import { BookOpenCheckIcon, CheckCircle2Icon, ExternalLinkIcon, MessageSquareWar
 import * as React from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { EmptyState, ErrorState, FormDialog, FormFieldTextarea, PageHeader, RoleGate } from '@/components/shared';
+import { Can, EmptyState, ErrorState, FormDialog, FormFieldTextarea, PageHeader } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useRoles } from '@/stores/session';
+import { useSession } from '@/stores/session';
 import { useApproveContent, useContentItem, useContentList, useRequestChanges } from '../api/queries';
 import type { ContentItem } from '../api/types';
 import { ApproveDialog } from '../components/approve-dialog';
@@ -56,7 +56,7 @@ export function ReviewQueuePage() {
               <EmptyState
                 icon={BookOpenCheckIcon}
                 title="Nothing to review"
-                description="Drafts appear here when an admin submits them."
+                description="Drafts appear here when an editor submits them."
                 className="border-0"
               />
             ) : (
@@ -101,7 +101,7 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
   const item = useContentItem(id);
   const approve = useApproveContent(id);
   const changes = useRequestChanges(id);
-  const { user } = useRoles();
+  const staff = useSession((s) => s.staff);
   const [dialog, setDialog] = React.useState<null | 'approve' | 'changes'>(null);
   // The copy the clinician is reading. A newer server copy never replaces it silently: approve and
   // request changes carry its revision, and a change shows the conflict banner instead.
@@ -140,7 +140,7 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
             {d && (
               <>
                 {' '}
-                · submitted by {d.byEmail ?? d.by} {formatRelative(d.at)}
+                · submitted by {d.byName ?? d.byEmail ?? d.by} {formatRelative(d.at)}
                 {d.source === 'n8n' && ' via n8n'}
               </>
             )}
@@ -159,15 +159,15 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
             </Link>
           </Button>
           {inReview && (
-            <RoleGate allow="clinician" mode="disable">
+            <Can perm="content.approve" mode="disable">
               <Button variant="outline" size="sm" disabled={moved} onClick={() => setDialog('changes')}>
                 <MessageSquareWarningIcon />
                 Request changes
               </Button>
-            </RoleGate>
+            </Can>
           )}
           {inReview && (
-            <RoleGate allow="clinician" mode="disable">
+            <Can perm="content.approve" mode="disable">
               <Button
                 size="sm"
                 disabled={moved}
@@ -177,7 +177,7 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
                 <CheckCircle2Icon />
                 Approve and publish
               </Button>
-            </RoleGate>
+            </Can>
           )}
         </div>
       </CardHeader>
@@ -198,7 +198,7 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
       </CardContent>
       <ApproveDialog
         item={pinned}
-        userId={user?.userId}
+        userId={staff ? `staff:${staff.id}` : undefined}
         open={dialog === 'approve'}
         onOpenChange={(o) => !o && setDialog(null)}
         onApprove={(v) => act(() => approve.mutateAsync({ rev: pinned.rev, ...v }), 'Approved and published')}
@@ -207,7 +207,7 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
         open={dialog === 'changes'}
         onOpenChange={(o) => !o && setDialog(null)}
         title="Request changes"
-        description="The draft goes back to the admin with your note."
+        description="The draft goes back to the editor with your note."
         schema={requiredNote}
         defaultValues={{ note: '' }}
         submitLabel="Send back"

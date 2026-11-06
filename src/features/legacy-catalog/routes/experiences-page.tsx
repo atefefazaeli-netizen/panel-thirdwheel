@@ -6,9 +6,8 @@ import {
   columnHelper,
   ConfirmDialog,
   DataTable,
-  ForbiddenState,
   PageHeader,
-  RoleGate,
+  RequirePermission,
   type FacetedFilterConfig,
 } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
@@ -23,9 +22,9 @@ const route = getRouteApi('/_app/experiences');
 
 export function ExperiencesPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="experiences" />}>
+    <RequirePermission perm="catalog.manage" what="experiences">
       <Experiences />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 

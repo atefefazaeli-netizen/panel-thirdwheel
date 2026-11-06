@@ -7,7 +7,7 @@ import {
   ErrorState,
   FormDialog,
   FormFieldTextarea,
-  RoleGate,
+  Can,
   StatusBadge,
 } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +36,8 @@ const ACTION_LABEL: Record<string, string> = {
   imported: 'Imported',
 };
 
-const who = (id: string, email: string | null) => (id === 'workbook' ? 'Release 1 bundle (seed)' : (email ?? id));
+const who = (id: string, email: string | null, name?: string | null) =>
+  id === 'workbook' ? 'Release 1 bundle (seed)' : (name ?? email ?? id);
 const rollbackSchema = z.object({ note: z.string().trim().max(2000) });
 
 export function HistoryTab({
@@ -109,12 +110,12 @@ export function HistoryTab({
                     <TableCell>
                       {ACTION_LABEL[v.action] ?? v.action}
                       {v.from != null && <span className="text-muted-foreground"> from v{v.from}</span>}
-                      {v.action === 'rolled_back' && v.byEmail && (
-                        <span className="block text-xs text-muted-foreground">by {v.byEmail}</span>
+                      {v.action === 'rolled_back' && (v.byName ?? v.byEmail) && (
+                        <span className="block text-xs text-muted-foreground">by {v.byName ?? v.byEmail}</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      {who(v.approvedBy, v.approvedByEmail)}
+                      {who(v.approvedBy, v.approvedByEmail, v.approvedByName)}
                       {v.seeded && (
                         <span className="block text-xs text-muted-foreground">{v.approvalLabel ?? SEEDED_LABEL}</span>
                       )}
@@ -128,7 +129,7 @@ export function HistoryTab({
                           View
                         </Button>
                         {v.version !== item.liveVersion && (
-                          <RoleGate allow="admin">
+                          <Can perm="content.unpublish">
                             <Button
                               variant="outline"
                               size="sm"
@@ -139,7 +140,7 @@ export function HistoryTab({
                               <RotateCcwIcon />
                               Roll back
                             </Button>
-                          </RoleGate>
+                          </Can>
                         )}
                       </div>
                     </TableCell>
@@ -168,18 +169,31 @@ export function HistoryTab({
                     {c.meta?.version != null && <Badge variant="secondary">v{c.meta.version}</Badge>}
                     {c.meta?.state && <StatusBadge status={c.meta.state} />}
                     <span className="text-muted-foreground">
-                      {who(c.by, c.byEmail)} · <time dateTime={c.at}>{formatRelative(c.at)}</time>
+                      {who(c.by, c.byEmail, c.byName)} · <time dateTime={c.at}>{formatRelative(c.at)}</time>
                     </span>
                   </div>
-                  {(c.meta?.selfApproved || c.meta?.acknowledgedHeld || c.meta?.clearedReview || c.meta?.restoredReview) && (
+                  {(c.meta?.selfApproved ||
+                    c.meta?.acknowledgedHeld ||
+                    c.meta?.clearedReview ||
+                    c.meta?.restoredReview) && (
                     <div className="flex flex-wrap gap-1">
                       {c.meta.selfApproved && <StatusBadge status="self" tone="warning" label="Self-approved" />}
-                      {c.meta.acknowledgedHeld && <StatusBadge status="held" tone="danger" label="Held content acknowledged" />}
+                      {c.meta.acknowledgedHeld && (
+                        <StatusBadge status="held" tone="danger" label="Held content acknowledged" />
+                      )}
                       {c.meta.clearedReview && (
-                        <StatusBadge status="cleared" tone="success" label={`Cleared review: ${c.meta.clearedReview.map(partLabel).join(', ')}`} />
+                        <StatusBadge
+                          status="cleared"
+                          tone="success"
+                          label={`Cleared review: ${c.meta.clearedReview.map(partLabel).join(', ')}`}
+                        />
                       )}
                       {c.meta.restoredReview && (
-                        <StatusBadge status="restored" tone="warning" label={`Needs review again: ${c.meta.restoredReview.map(partLabel).join(', ')}`} />
+                        <StatusBadge
+                          status="restored"
+                          tone="warning"
+                          label={`Needs review again: ${c.meta.restoredReview.map(partLabel).join(', ')}`}
+                        />
                       )}
                     </div>
                   )}

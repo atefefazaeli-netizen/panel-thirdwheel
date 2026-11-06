@@ -1,6 +1,6 @@
 import { AlertTriangleIcon, RotateCwIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { errorMessage, isApiError, isRoleRefusal } from '@/lib/api';
+import { errorMessage, isApiError, isPermissionRefusal } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ForbiddenState } from './forbidden-state';
 
@@ -12,8 +12,8 @@ export interface ErrorStateProps {
 }
 
 export function ErrorState({ error, title = 'Could not load this', onRetry, className }: ErrorStateProps) {
-  // A role refusal is a permission state, not an error (the session re-reads the roles meanwhile).
-  if (isRoleRefusal(error)) return <ForbiddenState />;
+  // A permission refusal is a state, not an error (the session re-reads its permissions meanwhile).
+  if (isPermissionRefusal(error)) return <ForbiddenState />;
   const requestId = isApiError(error) ? error.requestId : null;
   return (
     <div

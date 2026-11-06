@@ -5,15 +5,15 @@ import { renderRoute } from '@/test/utils';
 
 describe('audit log (mock API)', () => {
   it('filters by an action prefix from the URL', async () => {
-    renderRoute('/audit?action=content.', { roles: ['admin'] });
+    renderRoute('/audit?action=content.', { roles: ['owner'] });
     const table = await screen.findByRole('table', { name: 'Audit log' });
     const expected = db().audit.filter((a) => a.action.startsWith('content.')).length;
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(1 + expected));
     expect(within(table).getByText('apikey:n8n-sheets')).toBeInTheDocument();
   });
 
-  it('is admin only', async () => {
-    renderRoute('/audit', { roles: ['clinician'] });
+  it('needs audit.read', async () => {
+    renderRoute('/audit', { roles: ['content_reviewer'] });
     expect(await screen.findByText('Not available for your role')).toBeInTheDocument();
   });
 });

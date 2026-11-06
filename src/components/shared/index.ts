@@ -1,9 +1,9 @@
 export * from './app-shell';
 export * from './data-table';
 export * from './form-fields';
+export { Can, RequirePermission, type CanProps, type RequirePermissionProps } from './can';
 export { ConfirmDialog, type ConfirmDialogProps } from './confirm-dialog';
 export { CopyButton, type CopyButtonProps } from './copy-button';
-export { DemoBanner } from './demo-banner';
 export { DangerConfirmDialog, type DangerConfirmDialogProps } from './danger-confirm-dialog';
 export { DrawerPreview, type DrawerPreviewProps } from './drawer-preview';
 export { EmptyState, type EmptyStateProps } from './empty-state';
@@ -13,7 +13,6 @@ export { FormDialog, type FormDialogProps } from './form-dialog';
 export { JsonEditor, type JsonEditorProps } from './json-editor';
 export { MetricBadge, type MetricBadgeProps } from './metric-badge';
 export { PageHeader, type PageHeaderProps } from './page-header';
-export { RoleGate, type RoleGateProps } from './role-gate';
 export { SecretReveal, type SecretRevealProps } from './secret-reveal';
 export { StatCard, type StatCardProps } from './stat-card';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './status-badge';

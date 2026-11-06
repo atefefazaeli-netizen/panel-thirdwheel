@@ -28,11 +28,23 @@ export const aiSettingsSchema = (keys: { anthropic: boolean; openai: boolean }) 
     });
 export type AiSettingsForm = z.infer<ReturnType<typeof aiSettingsSchema>>;
 
-export const testSchema = z.object({
-  mode: z.string().min(1),
-  text: z.string().trim().min(1, 'Type a message to try.').max(TEST_TEXT_MAX, `At most ${TEST_TEXT_MAX} characters.`),
-  useDraft: z.boolean(),
-});
+export const testSchema = z
+  .object({
+    mode: z.string().min(1),
+    text: z.string().trim().min(1, 'Type a message to try.').max(TEST_TEXT_MAX, `At most ${TEST_TEXT_MAX} characters.`),
+    useDraft: z.boolean(),
+    /** STAFF_API.md §7: optional published content as read-only context. */
+    useContent: z.boolean(),
+    contentId: z.string().trim(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.useContent && !/^[a-z0-9][a-z0-9-]{0,79}$/.test(v.contentId))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contentId'],
+        message: 'Pick a content item (its id, like my-perfect-day).',
+      });
+  });
 
 /** Blank prompt text means "built-in default" (null), as the server stores it. */
 export const cleanPrompt = (s: string | null | undefined) => (typeof s === 'string' && s.trim() ? s.trim() : null);

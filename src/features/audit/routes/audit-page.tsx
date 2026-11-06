@@ -1,14 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router';
 import * as React from 'react';
-import {
-  columnHelper,
-  CopyButton,
-  DataTable,
-  DrawerPreview,
-  ForbiddenState,
-  PageHeader,
-  RoleGate,
-} from '@/components/shared';
+import { columnHelper, CopyButton, DataTable, DrawerPreview, PageHeader, RequirePermission } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { formatDateTime, formatRelative } from '@/lib/format';
@@ -36,8 +28,8 @@ const columns = h.columns([
         </Badge>
       ) : (
         <span className="flex flex-col">
-          <span className="text-sm">{c.row.original.actorEmail ?? c.getValue()}</span>
-          {c.row.original.actorEmail && (
+          <span className="text-sm">{c.row.original.actorName ?? c.row.original.actorEmail ?? c.getValue()}</span>
+          {(c.row.original.actorName ?? c.row.original.actorEmail) && (
             <span className="font-mono text-[11px] text-muted-foreground">{c.getValue()}</span>
           )}
         </span>
@@ -102,9 +94,9 @@ function TextFilter({
 
 export function AuditPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="the audit log" />}>
+    <RequirePermission perm="audit.read" what="the audit log">
       <Audit />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 
@@ -126,7 +118,7 @@ function Audit() {
     <>
       <PageHeader
         title="Audit log"
-        description="Every admin, clinician and n8n write: who, what and on what. Details never include message text or secrets."
+        description="Every staff and n8n write: who, what and on what. Details never include message text or secrets."
       />
       <DataTable
         id="audit"
@@ -185,7 +177,7 @@ function Audit() {
             <dl className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
               <dt className="text-muted-foreground">Who</dt>
               <dd className="break-words">
-                {open.actorEmail ?? open.actor}{' '}
+                {open.actorName ?? open.actorEmail ?? open.actor}{' '}
                 <span className="font-mono text-xs text-muted-foreground">{open.actor}</span>
               </dd>
               <dt className="text-muted-foreground">Action</dt>

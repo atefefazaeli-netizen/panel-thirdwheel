@@ -8,8 +8,8 @@ import { renderRoute } from '@/test/utils';
 const card = (label: string) => screen.getByText(label).closest('[data-slot=card]') as HTMLElement;
 
 describe('dashboard (mock API)', () => {
-  it('shows the stats and the three previews for an admin', async () => {
-    renderRoute('/', { roles: ['admin', 'clinician'] });
+  it('shows the stats and the three previews for an Owner', async () => {
+    renderRoute('/', { roles: ['owner'] });
     expect(await screen.findByText('My perfect day')).toBeInTheDocument();
     expect(within(card('Waiting for review')).getByText('2')).toBeInTheDocument();
     expect(await screen.findByText('Failed webhook deliveries')).toBeInTheDocument();
@@ -33,7 +33,7 @@ describe('dashboard (mock API)', () => {
         }),
       ),
     );
-    renderRoute('/', { roles: ['admin'] });
+    renderRoute('/', { roles: ['owner'] });
     expect(await screen.findByText('34')).toBeInTheDocument();
     expect(within(card('Plus')).getByText('Not available')).toBeInTheDocument();
     expect(within(card('Live content')).getByText('Not available')).toBeInTheDocument();
@@ -41,14 +41,18 @@ describe('dashboard (mock API)', () => {
     expect(within(card('Open safety flags')).getByText('4')).toBeInTheDocument();
   });
 
-  it('clinicians do not get the deliveries preview', async () => {
-    renderRoute('/', { roles: ['clinician'] });
-    expect(await screen.findByText('Drafts waiting for a clinician.')).toBeInTheDocument();
+  it('a content reviewer sees only the content parts: no deliveries, flags, users or support', async () => {
+    renderRoute('/', { roles: ['content_reviewer'] });
+    expect(await screen.findByText('Drafts waiting for a content reviewer.')).toBeInTheDocument();
+    expect(screen.getByText('Live content')).toBeInTheDocument();
     expect(screen.queryByText('Failed webhook deliveries')).toBeNull();
+    expect(screen.queryByText('Open high flags')).toBeNull();
+    expect(screen.queryByText('Accounts')).toBeNull();
+    expect(screen.queryByText('Open support tickets')).toBeNull();
   });
 
   it('puts counts on the sidebar', async () => {
-    renderRoute('/', { roles: ['admin', 'clinician'] });
+    renderRoute('/', { roles: ['owner'] });
     expect(await screen.findByLabelText('2 waiting')).toBeInTheDocument();
   });
 });

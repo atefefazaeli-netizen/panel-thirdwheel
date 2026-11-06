@@ -1,60 +1,64 @@
 import { z } from 'zod';
 
-export const emailSchema = z.object({
-  email: z.string().trim().toLowerCase().min(1, 'Enter your email.').max(254).pipe(z.email('Enter a valid email.')),
-});
-export type EmailValues = z.input<typeof emailSchema>;
-
-export const codeSchema = z.object({
-  code: z
+export const credentialsSchema = z.object({
+  username: z
     .string()
     .trim()
-    .regex(/^\d{6}$/, 'The code is 6 digits.'),
+    .toLowerCase()
+    .min(1, 'Enter your username.')
+    .max(40, 'Usernames are at most 40 characters.'),
+  password: z.string().min(1, 'Enter your password.').max(128, 'Passwords are at most 128 characters.'),
 });
-export type CodeValues = z.infer<typeof codeSchema>;
+export type CredentialsValues = z.infer<typeof credentialsSchema>;
 
-/** Copy for the verify failures (backend VerifyResultDto). */
-export function codeFailureMessage(code: string, attempts = 0): string {
-  switch (code) {
-    case 'CODE_INCORRECT': {
-      const left = Math.max(0, 3 - attempts);
-      return left > 0
-        ? `That code is not right. ${left} ${left === 1 ? 'try' : 'tries'} left.`
-        : 'That code is not right.';
-    }
-    case 'CODE_LOCKED':
-      return 'Three wrong codes. Get a new code below.';
-    case 'CODE_EXPIRED':
-      return 'This code expired. Get a new one below.';
-    case 'SESSION_NOT_FOUND':
-      return 'This sign-in expired. Start again with your email.';
-    default:
-      return 'Could not check the code.';
-  }
+/** A TOTP code from an authenticator app (RFC 6238, 6 digits). Spaces are ignored. */
+export const totpCode = z
+  .string()
+  .transform((v) => v.replace(/\s+/g, ''))
+  .pipe(z.string().regex(/^\d{6}$/, 'The code is 6 digits from your authenticator app.'));
+
+export const totpSchema = z.object({ code: totpCode });
+export type TotpValues = z.input<typeof totpSchema>;
+
+export const recoverySchema = z.object({
+  recoveryCode: z.string().trim().min(1, 'Enter one of your recovery codes.').max(64, 'That is not a recovery code.'),
+});
+export type RecoveryValues = z.infer<typeof recoverySchema>;
+
+export const PASSWORD_MIN = 12;
+export const PASSWORD_MAX = 128;
+
+/**
+ * The server's password policy (STAFF_API.md §2): 12 to 128 characters, not containing the
+ * username. The server also refuses common passwords (400 WEAK_PASSWORD with `details`).
+ */
+export function newPasswordSchema(username: string, needCurrent: boolean) {
+  return z
+    .object({
+      currentPassword: needCurrent ? z.string().min(1, 'Enter your current password.') : z.string(),
+      newPassword: z
+        .string()
+        .min(PASSWORD_MIN, `At least ${PASSWORD_MIN} characters.`)
+        .max(PASSWORD_MAX, `At most ${PASSWORD_MAX} characters.`)
+        .refine(
+          (v) => !username || !v.toLowerCase().includes(username.toLowerCase()),
+          'It cannot contain your username.',
+        ),
+      confirm: z.string(),
+    })
+    .refine((v) => v.newPassword === v.confirm, { path: ['confirm'], message: 'The two passwords do not match.' });
 }
+export type NewPasswordValues = { currentPassword: string; newPassword: string; confirm: string };
 
-/** First sign-in (API v1.6.0+): the birthday step. The API decides 18+; this only checks the shape. */
-export const birthdaySchema = z.object({
-  birthday: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your birthday.')
-    .refine((v) => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)), 'Enter a real date.'),
-});
-export type BirthdayValues = z.infer<typeof birthdaySchema>;
+export const passwordOnlySchema = z.object({ password: z.string().min(1, 'Enter your password.') });
+export type PasswordOnlyValues = z.infer<typeof passwordOnlySchema>;
 
-/** Copy for the signup/complete refusals. */
-export function birthdayFailureMessage(code: string | null): string {
-  switch (code) {
-    case 'UNDER_18':
-      return 'Thirdwheel accounts are for adults 18 and over. Nothing was saved.';
-    case 'BIRTHDAY_IN_FUTURE':
-      return 'That date is in the future.';
-    case 'BIRTHDAY_INVALID':
-      return 'Enter a real date.';
-    case 'SIGNUP_TICKET_INVALID':
-      return 'This sign-in timed out. Start again with your email.';
-    default:
-      return 'Could not finish signing in.';
-  }
+export const disableMfaSchema = z.object({ password: z.string().min(1, 'Enter your password.'), code: totpCode });
+export type DisableMfaValues = z.input<typeof disableMfaSchema>;
+
+/** WEAK_PASSWORD `details` as lines. */
+export function weakPasswordDetails(details: unknown): string[] {
+  if (Array.isArray(details)) return details.filter((d): d is string => typeof d === 'string');
+  if (typeof details === 'string') return [details];
+  return [];
 }

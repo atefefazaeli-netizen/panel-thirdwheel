@@ -12,11 +12,11 @@ const buttonNames = (el: HTMLElement) =>
     .sort();
 
 describe('content item editor (mock API)', () => {
-  it('clinician sees only Approve and Request changes on a draft in review, and approves it', async () => {
+  it('a content reviewer sees Approve, Request changes and Unpublish on a draft in review (no editing), and approves it', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/my-perfect-day', { roles: ['clinician'] });
+    renderRoute('/content/my-perfect-day', { roles: ['content_reviewer'] });
     const b = await bar();
-    expect(buttonNames(b)).toEqual(['Approve and publish', 'Request changes']);
+    expect(buttonNames(b)).toEqual(['Approve and publish', 'Request changes', 'Unpublish']);
     expect(screen.getByText('Read only')).toBeInTheDocument();
 
     await user.click(within(b).getByRole('button', { name: 'Approve and publish' }));
@@ -31,7 +31,7 @@ describe('content item editor (mock API)', () => {
 
   it('request changes needs a note', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/my-perfect-day', { roles: ['clinician'] });
+    renderRoute('/content/my-perfect-day', { roles: ['content_reviewer'] });
     const b = await bar();
     await user.click(within(b).getByRole('button', { name: 'Request changes' }));
     const dialog = await screen.findByRole('dialog', { name: 'Request changes' });
@@ -42,11 +42,11 @@ describe('content item editor (mock API)', () => {
     await waitFor(() => expect(db().content.items.get('my-perfect-day')!.draft!.state).toBe('changes_requested'));
   });
 
-  it('admin only: no approve on a draft in review; saves an edit as a draft and submits it', async () => {
+  it('a content editor: no approve and no unpublish; saves an edit as a draft and submits it', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/blind-taste-test', { roles: ['admin'] });
+    renderRoute('/content/blind-taste-test', { roles: ['content_editor'] });
     const b = await bar();
-    expect(buttonNames(b)).toEqual(['Save draft', 'Submit for review', 'Unpublish']);
+    expect(buttonNames(b)).toEqual(['Save draft', 'Submit for review']);
     expect(within(b).getByRole('button', { name: 'Save draft' })).toBeDisabled();
 
     const title = screen.getByRole('textbox', { name: 'Title' });
@@ -74,15 +74,15 @@ describe('content item editor (mock API)', () => {
 
   it('blocks saving an invalid draft (empty title)', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/blind-taste-test', { roles: ['admin'] });
+    renderRoute('/content/blind-taste-test', { roles: ['content_editor'] });
     const b = await bar();
     await user.clear(screen.getByRole('textbox', { name: 'Title' }));
     expect(await screen.findByText('Title is required.')).toBeInTheDocument();
     expect(within(b).getByRole('button', { name: 'Save draft' })).toBeDisabled();
   });
 
-  it('retired items offer Restore', async () => {
-    renderRoute('/content/phone-stack', { roles: ['admin'] });
+  it('retired items offer Restore (content.unpublish)', async () => {
+    renderRoute('/content/phone-stack', { roles: ['content_reviewer'] });
     const b = await bar();
     expect(buttonNames(b)).toContain('Restore');
     expect(buttonNames(b)).not.toContain('Unpublish');

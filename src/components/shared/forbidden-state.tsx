@@ -7,7 +7,7 @@ export function ForbiddenState({ what = 'this page' }: { what?: string }) {
     <EmptyState
       icon={LockIcon}
       title="Not available for your role"
-      description={`Your account can't open ${what}. Ask an admin if you need it.`}
+      description={`Your account can't open ${what}. Ask an Owner if you need it.`}
     />
   );
 }

@@ -41,8 +41,8 @@ export function ProvenancePanel({ item }: { item: ContentItem }) {
             ))}
           </ul>
           <p className="mt-1">
-            A clinician clears these by approving a version of this item (submit a draft, even unchanged, for
-            review). The approval clears the whole item and is recorded with their name.
+            A clinician clears these by approving a version of this item (submit a draft, even unchanged, for review).
+            The approval clears the whole item and is recorded with their name.
           </p>
           <ProvenanceDetails item={item} />
         </AlertDescription>
@@ -55,9 +55,9 @@ export function ProvenancePanel({ item }: { item: ContentItem }) {
       <AlertDescription>
         {p?.clearedBy ? (
           <p>
-            Cleared by {p.clearedBy.byEmail ?? p.clearedBy.by} on {formatDateTime(p.clearedBy.at)} (version{' '}
-            {p.clearedBy.version}, {p.clearedBy.via === 'approved' ? 'approval' : p.clearedBy.via}). It covered:{' '}
-            {p.flagged.map((n) => partLabel(n.part)).join(', ')}.
+            Cleared by {p.clearedBy.byName ?? p.clearedBy.byEmail ?? p.clearedBy.by} on {formatDateTime(p.clearedBy.at)}{' '}
+            (version {p.clearedBy.version}, {p.clearedBy.via === 'approved' ? 'approval' : p.clearedBy.via}). It
+            covered: {p.flagged.map((n) => partLabel(n.part)).join(', ')}.
           </p>
         ) : item.liveSeeded ? (
           <p>{SEEDED_LABEL}. Every part is the clinician-cleared workbook's text.</p>
@@ -96,7 +96,13 @@ export function HeldBanner({ match }: { match: HeldMatch }) {
         <ul className="list-disc pl-4">
           {match.reasons.map((r, i) => (
             <li key={i}>
-              {r.field === 'title' ? 'Title' : r.field === 'category' ? 'Category' : r.field === 'world' ? 'World' : 'Sub'}{' '}
+              {r.field === 'title'
+                ? 'Title'
+                : r.field === 'category'
+                  ? 'Category'
+                  : r.field === 'world'
+                    ? 'World'
+                    : 'Sub'}{' '}
               “{r.value}” matches the held {r.held.type.toLowerCase()} “{r.held.item}” ({r.held.world}): {r.held.why}.
             </li>
           ))}

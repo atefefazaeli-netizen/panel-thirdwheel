@@ -83,7 +83,7 @@ const conflict = () =>
 
 export const aiHandlers = [
   http.get(p('admin/ai/settings'), ({ request }) =>
-    guard(request, 'staff', () =>
+    guard(request, 'ai.read', () =>
       HttpResponse.json({
         current: current(),
         defaults: {
@@ -101,7 +101,7 @@ export const aiHandlers = [
   ),
 
   http.put(p('admin/ai/settings'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'ai.edit', async (me) => {
       const { baseVersion, ...body } = await readJson<
         Partial<AiSettingsInput> & { note?: string; baseVersion?: number }
       >(request);
@@ -117,6 +117,7 @@ export const aiHandlers = [
           note: body.note?.trim() || null,
           updatedBy: me.userId,
           updatedByEmail: me.email,
+          updatedByName: me.name,
           createdAt: nowIso(),
         });
         recordAudit(me, 'ai.settings.update', `ai-settings:${version}`, {
@@ -132,12 +133,13 @@ export const aiHandlers = [
   ),
 
   http.get(p('admin/ai/settings/history'), ({ request }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'ai.read', () => {
       const rows = [...db().ai.versions].reverse().map((v) => ({
         version: v.version,
         updatedAt: v.createdAt,
         updatedBy: v.updatedBy,
         updatedByEmail: v.updatedByEmail,
+        updatedByName: v.updatedByName ?? null,
         note: v.note,
         settings: runtimeOf(v),
       }));
@@ -146,7 +148,7 @@ export const aiHandlers = [
   ),
 
   http.post(p('admin/ai/settings/rollback'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'ai.edit', async (me) => {
       const { version, baseVersion } = await readJson<{ version?: number; baseVersion?: number }>(request);
       if (baseVersion !== undefined && baseVersion !== (latest()?.version ?? 0)) return conflict();
       const target = db().ai.versions.find((v) => v.version === version);
@@ -160,6 +162,7 @@ export const aiHandlers = [
           note: `Rollback to version ${target.version}`,
           updatedBy: me.userId,
           updatedByEmail: me.email,
+          updatedByName: me.name,
           createdAt: nowIso(),
         });
         recordAudit(me, 'ai.settings.rollback', `ai-settings:${next}`, { from: target.version });
@@ -172,8 +175,22 @@ export const aiHandlers = [
   ),
 
   http.post(p('admin/ai/test'), ({ request }) =>
-    guard(request, 'admin', async () => {
-      const body = await readJson<{ mode?: string; text?: string; draft?: Partial<AiSettingsInput> }>(request);
+    guard(request, 'ai.test', async (me) => {
+      const body = await readJson<{
+        mode?: string;
+        text?: string;
+        draft?: Partial<AiSettingsInput>;
+        contentId?: string;
+      }>(request);
+      // STAFF_API.md §7: optional context is one item's published snapshot, never a draft or user data.
+      let context: string | null = null;
+      if (body.contentId !== undefined) {
+        const item = db().content.items.get(String(body.contentId));
+        if (!item) return apiError(404, 'Content not found', 'CONTENT_NOT_FOUND');
+        if (!item.live || item.retired) return apiError(409, 'This item has no published version.', 'NOT_PUBLISHED');
+        context = String(item.live.catalog.title ?? item.id);
+      }
+      recordAudit(me, 'ai.test', 'ai-test', { mode: body.mode, contentId: body.contentId ?? null });
       if (!body.mode || (!AI_MODES.includes(body.mode) && body.mode !== 'quiz'))
         return badRequest('mode must be a Third Ear mode or quiz');
       if (!body.text?.trim() || body.text.length > 1000) return badRequest('text must be 1 to 1000 characters');
@@ -208,7 +225,9 @@ export const aiHandlers = [
       await delay(import.meta.env.MODE === 'test' ? 10 : 700);
       return HttpResponse.json({
         source: 'ai',
-        reply: sampleReply[body.mode] ?? 'Thanks for telling me. What matters most to you about this right now?',
+        reply:
+          (sampleReply[body.mode] ?? 'Thanks for telling me. What matters most to you about this right now?') +
+          (context ? ` (Context: the published "${context}".)` : ''),
         latencyMs: Math.round(performance.now() - started) + 600,
         provider: s.provider,
         model,

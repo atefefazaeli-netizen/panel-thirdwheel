@@ -42,6 +42,7 @@ export interface AiSettingsHistoryEntry {
   updatedAt: string;
   updatedBy: string | null;
   updatedByEmail: string | null;
+  updatedByName?: string | null;
   note: string | null;
   settings: AiRuntimeSettings;
 }

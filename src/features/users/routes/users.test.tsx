@@ -14,8 +14,8 @@ describe('users (mock API)', () => {
     expect(screen.getByText('1 result')).toBeInTheDocument();
   });
 
-  it('clinicians cannot open users', async () => {
-    renderRoute('/users', { roles: ['clinician'] });
+  it('needs users.read', async () => {
+    renderRoute('/users', { roles: ['content_reviewer'] });
     expect(await screen.findByText('Not available for your role')).toBeInTheDocument();
   });
 

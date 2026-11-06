@@ -1,46 +1,118 @@
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { InfoIcon } from 'lucide-react';
 import * as React from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ThemeToggle } from '@/components/shared';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DemoBanner, ThemeToggle } from '@/components/shared';
-import { env } from '@/config/env';
+import { devUi } from '@/config/dev-ui';
+import { errorMessage } from '@/lib/api';
 import { useSession } from '@/stores/session';
-import { completeSignIn } from '../api/session';
-import { BirthdayStep } from '../components/birthday-step';
-import { CodeStep } from '../components/code-step';
-import { EmailStep } from '../components/email-step';
-import { NoAccess } from '../components/no-access';
+import { authApi, type LoginResult } from '../api/auth-api';
+import { signOut } from '../api/session';
+import { CredentialsStep } from '../components/credentials-step';
+import { MfaEnroll } from '../components/mfa-enroll';
+import { MfaStep } from '../components/mfa-step';
+import { PasswordForm } from '../components/password-form';
 
 const route = getRouteApi('/login');
 
-type Step =
-  | { kind: 'email' }
-  | { kind: 'code'; email: string; session: string; resendAt: number }
-  | { kind: 'birthday'; email: string; ticket: string };
+type Step = { kind: 'credentials' } | { kind: 'mfa'; challenge: string };
 
 const ENDED_COPY: Record<string, string> = {
-  suspended: 'This account is suspended.',
-  refresh_failed: 'Your session ended. Sign in again.',
+  expired: 'Your session ended. Sign in again.',
 };
 
 export function LoginPage() {
   const { redirect } = route.useSearch();
   const navigate = useNavigate();
   const status = useSession((s) => s.status);
-  const deniedEmail = useSession((s) => s.deniedEmail);
+  const restricted = useSession((s) => s.restricted);
+  const staff = useSession((s) => s.staff);
   const endedReason = useSession((s) => s.endedReason);
-  const [step, setStep] = React.useState<Step>({ kind: 'email' });
-  const [lastEmail, setLastEmail] = React.useState<string>();
+  const [step, setStep] = React.useState<Step>({ kind: 'credentials' });
+  const [notice, setNotice] = React.useState<string | null>(null);
+  // The password typed in this tab, kept only in memory for the setup steps that ask for it
+  // again (MFA setup, password change). Never stored anywhere.
+  const [password, setPassword] = React.useState<string | undefined>(undefined);
+  const { LoginHint } = devUi();
 
-  const back = () => {
-    useSession.getState().signOut(null);
-    setStep({ kind: 'email' });
+  const enter = () => navigate({ to: redirect ?? '/', replace: true });
+
+  const onLogin = async (r: LoginResult) => {
+    setNotice(null);
+    if (r.status === 'mfa_required') setStep({ kind: 'mfa', challenge: r.challenge });
+    else if (r.status === 'ok') await enter();
+    // mfa_enrollment_required / password_change_required: the session store is now restricted and
+    // this page shows that step.
   };
+
+  /** A setup step finished: read the session again (the next restriction, or none). */
+  const afterSetup = async () => {
+    try {
+      const info = await authApi.session();
+      if (!info.restricted) await enter();
+    } catch (e) {
+      setNotice(errorMessage(e));
+    }
+  };
+
+  const startOver = async () => {
+    setPassword(undefined);
+    await signOut();
+    setStep({ kind: 'credentials' });
+  };
+
+  let title = 'Sign in';
+  let description = 'Staff sign in with the username and password an Owner gave them.';
+  let body: React.ReactNode;
+
+  if (status === 'restricted' && staff && restricted === 'mfa_enrollment') {
+    title = 'Set up two-factor sign-in';
+    description = 'Your role needs a code from an authenticator app at every sign-in. This takes a minute.';
+    body = <MfaEnroll username={staff.username} password={password} onDone={afterSetup} />;
+  } else if (status === 'restricted' && staff && restricted === 'password_change') {
+    title = 'Choose a new password';
+    description = 'You signed in with a temporary password. Choose your own to continue.';
+    body = (
+      <PasswordForm
+        username={staff.username}
+        currentPassword={password}
+        submitLabel="Save and continue"
+        onDone={async () => {
+          setPassword(undefined);
+          await afterSetup();
+        }}
+      />
+    );
+  } else if (step.kind === 'mfa') {
+    title = 'Two-factor sign-in';
+    description = 'Enter the code from your authenticator app.';
+    body = (
+      <MfaStep
+        challenge={step.challenge}
+        onResult={onLogin}
+        onRestart={(m) => {
+          setNotice(m);
+          setStep({ kind: 'credentials' });
+        }}
+      />
+    );
+  } else {
+    body = (
+      <CredentialsStep
+        onResult={(r, v) => {
+          setPassword(v.password);
+          return onLogin(r);
+        }}
+      />
+    );
+  }
+
+  const ended = endedReason ? ENDED_COPY[endedReason] : null;
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
-      {env.useMocks && <DemoBanner className="fixed inset-x-0 top-0 z-30" />}
       <div className="absolute top-3 right-3">
         <ThemeToggle />
       </div>
@@ -56,81 +128,28 @@ export function LoginPage() {
         </div>
       </div>
       <Card className="w-full max-w-sm">
-        {status === 'noAccess' ? (
-          <CardContent>
-            <NoAccess email={deniedEmail} onBack={back} />
-          </CardContent>
-        ) : (
-          <>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {step.kind === 'email' ? 'Sign in' : step.kind === 'code' ? 'Check your email' : 'Your birthday'}
-              </CardTitle>
-              <CardDescription>
-                {step.kind === 'email'
-                  ? 'Staff sign in with a one-time code. No passwords.'
-                  : step.kind === 'code'
-                    ? 'Enter the code to finish signing in.'
-                    : 'One more step before your first sign-in.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {endedReason && ENDED_COPY[endedReason] && step.kind === 'email' && (
-                <Alert variant="destructive">
-                  <InfoIcon />
-                  <AlertDescription>{ENDED_COPY[endedReason]}</AlertDescription>
-                </Alert>
-              )}
-              {step.kind === 'email' ? (
-                <EmailStep
-                  defaultEmail={lastEmail}
-                  onSent={(email, session, resendAt) => {
-                    setLastEmail(email);
-                    setStep({ kind: 'code', email, session, resendAt });
-                  }}
-                />
-              ) : step.kind === 'birthday' ? (
-                <BirthdayStep
-                  ticket={step.ticket}
-                  onRestart={() => setStep({ kind: 'email' })}
-                  onVerified={async (tokens) => {
-                    const result = await completeSignIn(tokens, step.email);
-                    if (result === 'signedIn') await navigate({ to: redirect ?? '/', replace: true });
-                    else setStep({ kind: 'email' });
-                  }}
-                />
-              ) : (
-                <CodeStep
-                  email={step.email}
-                  session={step.session}
-                  resendAt={step.resendAt}
-                  onResent={(resendAt) => setStep({ ...step, resendAt })}
-                  onBack={() => setStep({ kind: 'email' })}
-                  onBirthdayRequired={(ticket) => setStep({ kind: 'birthday', email: step.email, ticket })}
-                  onVerified={async (tokens) => {
-                    const result = await completeSignIn(tokens, step.email);
-                    if (result === 'signedIn') await navigate({ to: redirect ?? '/', replace: true });
-                    else setStep({ kind: 'email' });
-                  }}
-                />
-              )}
-            </CardContent>
-          </>
-        )}
+        <CardHeader>
+          <CardTitle>
+            <h1 className="text-lg">{title}</h1>
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {(notice || (ended && step.kind === 'credentials' && status === 'signedOut')) && (
+            <Alert>
+              <InfoIcon />
+              <AlertDescription>{notice ?? ended}</AlertDescription>
+            </Alert>
+          )}
+          {body}
+          {(status === 'restricted' || step.kind === 'mfa') && (
+            <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => void startOver()}>
+              Sign out and start again
+            </Button>
+          )}
+        </CardContent>
       </Card>
-      {env.useMocks && (
-        <Alert className="max-w-sm">
-          <InfoIcon />
-          <AlertTitle>Demo sign-in (mock API)</AlertTitle>
-          <AlertDescription>
-            <p>
-              Any email, code <span className="font-mono font-semibold">123456</span>. Use{' '}
-              <span className="font-mono">admin-only@…</span> or <span className="font-mono">clinician@…</span> for one
-              role, <span className="font-mono">nostaff@…</span> for no access.
-            </p>
-          </AlertDescription>
-        </Alert>
-      )}
+      {LoginHint && step.kind === 'credentials' && status !== 'restricted' && <LoginHint />}
     </main>
   );
 }

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { ForbiddenState, FormFieldTextarea, JsonEditor, PageHeader, RoleGate, StatusBadge } from '@/components/shared';
+import { FormFieldTextarea, JsonEditor, PageHeader, RequirePermission, StatusBadge } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,9 +45,9 @@ const noteSchema = z.object({ note: z.string().trim().max(500) });
 
 export function ContentImportPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="content import" />}>
+    <RequirePermission perm="content.edit" what="content import">
       <ImportScreen />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 
@@ -261,7 +261,9 @@ function ServerCell({ result, done }: { result: ContentImportItemResult | undefi
     return (
       <span className="flex flex-col text-xs text-destructive">
         <span>Rejected: {result.reason}</span>
-        {result.details?.map((d) => <span key={d}>{d}</span>)}
+        {result.details?.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
       </span>
     );
   const what =
@@ -270,7 +272,9 @@ function ServerCell({ result, done }: { result: ContentImportItemResult | undefi
         ? 'Created, in review'
         : 'New item'
       : `${done ? 'Updated' : 'Exists'}: ${
-          result.replacedDraft ? `replaces its draft (${STATE_LABEL[result.replacedDraft]})` : 'becomes its draft in review'
+          result.replacedDraft
+            ? `replaces its draft (${STATE_LABEL[result.replacedDraft]})`
+            : 'becomes its draft in review'
         }`;
   return (
     <span className="flex flex-col gap-0.5">

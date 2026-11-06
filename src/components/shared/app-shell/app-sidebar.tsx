@@ -14,7 +14,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { canAccess, type StaffUser } from '@/stores/session';
+import { hasPermissions, type StaffMe } from '@/stores/session';
 import { isActive, NAV, type NavItem } from './nav';
 
 export type NavBadges = Partial<Record<NonNullable<NavItem['badge']>, number | null | undefined>>;
@@ -29,11 +29,11 @@ function Mark() {
   );
 }
 
-export function AppSidebar({ user, badges = {} }: { user: StaffUser | null; badges?: NavBadges }) {
+export function AppSidebar({ staff, badges = {} }: { staff: StaffMe | null; badges?: NavBadges }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isMobile, setOpenMobile } = useSidebar();
   // The deepest matching item wins, so /content/import highlights Import, not Content.
-  const all = NAV.flatMap((g) => g.items).filter((i) => isActive(pathname, i));
+  const all = NAV.flatMap((g) => g.items).filter((i) => isActive(pathname, i) && hasPermissions(staff, i.permission));
   const activeTo = all.sort((a, b) => b.to.length - a.to.length)[0]?.to;
 
   return (
@@ -55,7 +55,7 @@ export function AppSidebar({ user, badges = {} }: { user: StaffUser | null; badg
       </SidebarHeader>
       <SidebarContent>
         {NAV.map((group) => {
-          const items = group.items.filter((i) => !i.roles || canAccess(user, i.roles));
+          const items = group.items.filter((i) => hasPermissions(staff, i.permission));
           if (items.length === 0) return null;
           return (
             <SidebarGroup key={group.label} className="py-1">

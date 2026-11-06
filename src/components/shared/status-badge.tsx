@@ -21,6 +21,17 @@ const KNOWN: Record<string, { tone: StatusTone; label: string }> = {
   low: { tone: 'neutral', label: 'Low' },
   // support
   closed: { tone: 'muted', label: 'Closed' },
+  in_progress: { tone: 'info', label: 'In progress' },
+  waiting_for_user: { tone: 'warning', label: 'Waiting for user' },
+  resolved: { tone: 'success', label: 'Resolved' },
+  urgent: { tone: 'danger', label: 'Urgent' },
+  normal: { tone: 'neutral', label: 'Normal' },
+  sent: { tone: 'success', label: 'Sent' },
+  // switches and staff accounts
+  on: { tone: 'success', label: 'On' },
+  off: { tone: 'muted', label: 'Off' },
+  locked: { tone: 'danger', label: 'Locked' },
+  published: { tone: 'success', label: 'Published' },
   // deliveries and webhooks
   pending: { tone: 'info', label: 'Pending' },
   delivered: { tone: 'success', label: 'Delivered' },
