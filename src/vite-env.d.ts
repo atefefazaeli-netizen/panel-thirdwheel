@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** The panel's package.json version (vite.config.ts `define`). */
+declare const __PANEL_VERSION__: string;

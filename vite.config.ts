@@ -37,7 +37,11 @@ export default defineConfig(({ command, mode }) => {
     if (problems.length) throw new Error(`Refusing to build the panel for production:\n  - ${problems.join('\n  - ')}`);
   }
 
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf8')) as { version: string };
+
   return {
+    // Shown in the sidebar footer; one source of truth (package.json).
+    define: { __PANEL_VERSION__: JSON.stringify(pkg.version) },
     plugins: [react(), tailwindcss(), dropMockWorker()],
     resolve: {
       alias: { '@': path.resolve(import.meta.dirname, 'src') },
