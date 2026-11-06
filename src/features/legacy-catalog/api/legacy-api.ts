@@ -19,7 +19,7 @@ export const legacyApi = {
     api.patch<Experience>(`experiences/${encodeURIComponent(id)}`, patch),
   deleteExperience: (id: string) => api.delete<void>(`experiences/${encodeURIComponent(id)}`),
 
-  bookingLink: (cardId: string) => api.get<BookingLink>(`ideas/${encodeURIComponent(cardId)}/booking-link`),
+  bookingLink: (cardId: string) => api.get<BookingLink>(`ideas/${encodeURIComponent(cardId)}/booking-link/admin`),
   setBookingLink: (cardId: string, body: { url: string; venue: string | null; paid: boolean }) =>
     api.put<BookingLink>(`ideas/${encodeURIComponent(cardId)}/booking-link`, body),
   removeBookingLink: (cardId: string) => api.delete<void>(`ideas/${encodeURIComponent(cardId)}/booking-link`),

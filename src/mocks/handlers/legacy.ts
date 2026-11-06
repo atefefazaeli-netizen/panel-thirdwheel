@@ -1,5 +1,5 @@
 // Existing legacy routes: catalog/items (public reads, admin writes), experiences (public reads,
-// admin writes) and ideas/:id/booking-link (public read, admin writes).
+// admin writes) and ideas/:id/booking-link (staff read at /admin, staff writes).
 import { http, HttpResponse } from 'msw';
 import type { CatalogItem } from '@/features/legacy-catalog/api/types';
 import { EXP_LABEL } from '../data/legacy';
@@ -175,7 +175,7 @@ export const legacyHandlers = [
     }),
   ),
 
-  http.get(p('ideas/:id/booking-link'), ({ request, params }) =>
+  http.get(p('ideas/:id/booking-link/admin'), ({ request, params }) =>
     guard(request, 'session', () => {
       const id = String(params.id);
       if (!CARD.test(id)) return badRequest('id must match /^[a-z0-9][a-z0-9-]{0,39}$/');
