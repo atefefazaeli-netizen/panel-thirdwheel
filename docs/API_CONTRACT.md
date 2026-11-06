@@ -1,4 +1,134 @@
-> **Copy for reference.** The source of truth is `backend/docs/ADMIN_API.md` in the app repo (`atefefazaeli-netizen/app`). When they differ, the backend file wins; update this copy from it. Copied on 2026-11-04 (accounts audit). Notes on how the panel reads the open points are in [ARCHITECTURE.md](ARCHITECTURE.md#10-contract-notes).
+> **Copy for reference.** The sources of truth are `backend/docs/STAFF_API.md` and `backend/docs/ADMIN_API.md` in the app repo. Where they differ, STAFF_API.md wins (it says so itself); when this copy and the backend files differ, the backend files win: update this copy from them. Copied on 2026-11-06. How the panel reads the open points: [ARCHITECTURE.md](ARCHITECTURE.md#10-contract-notes).
+
+---
+
+<!-- backend/docs/STAFF_API.md -->
+
+# Admin panel v2 contract: staff accounts, permissions, support workflow, Remote Config
+
+Source of truth for the backend and panel builders (Nov 6). Extends `ADMIN_API.md`; where they differ, this file wins. All routes under `/api/v1`. Errors keep `{ statusCode, message, code?, requestId, retryAt?, details? }`. Lists keep `{ items, meta: { page, limit, total, totalPages } }`.
+
+## 0. Decisions (from the product owner)
+- The panel signs in with **username and password** only. No email, no email codes. App-user sign-in (email OTP, Google, Apple) is unchanged.
+- **Staff accounts are a separate store** (`staff_accounts`), never app users. `ADMIN_EMAILS` / `CLINICIAN_EMAILS` stop granting anything: app accounts are plain users again (migration strips `admin` / `clinician` from `users.roles`; the env vars are removed from validation with a startup warning if still set).
+- Passwords: **Argon2id** (`@node-rs/argon2`; memoryCost 19456 KiB, timeCost 2, parallelism 1 or stronger). Never logged, never returned.
+- Sessions: opaque **HttpOnly cookie** `tw_staff_sid`; nothing in localStorage/sessionStorage. **CSRF**: every POST/PUT/PATCH/DELETE on a staff route needs header `X-CSRF-Token` equal to the session's token (timing-safe compare) AND an `Origin` in `PANEL_ORIGINS` (exact match). 403 `CSRF_FAILED` otherwise.
+- **TOTP MFA** (RFC 6238, SHA-1, 6 digits, 30 s, ±1 step, a used step can't be reused) is required for every account holding the Owner role; optional for others. 10 single-use recovery codes, stored hashed. No email MFA.
+- First Owner: only from env secrets through a CLI (`npm run staff:bootstrap-owner`), only when no Owner exists, no defaults.
+- Permissions are enforced in the backend; deny by default; the panel only mirrors them.
+
+## 1. Cookies, CORS, origins
+- Cookie `tw_staff_sid`: `HttpOnly`, `Secure` (env `STAFF_COOKIE_SECURE`, default true in production, false otherwise), `SameSite` from `STAFF_COOKIE_SAMESITE` (`strict` default; `none` only for cross-site deployments, then Secure is forced), `Path=/api/v1`, no `Domain`. Max-Age = absolute session lifetime.
+- Session lifetime: idle `STAFF_SESSION_IDLE_MINUTES` (default 60), absolute `STAFF_SESSION_MAX_HOURS` (default 12). Stored as SHA-256 of the id in `staff_sessions` with TTL on `expiresAt`.
+- `PANEL_ORIGINS`: comma list of exact panel origins (e.g. `https://panel.thirdwheel.app`). CORS allows them with `credentials: true`; staff writes check `Origin` against it. `PANEL_URL` stays the link base for n8n payloads.
+- The panel calls the API with `credentials: 'include'`.
+
+## 2. Staff authentication (`staff/auth/*`, public routes with their own guard and rate limits)
+Login rate limits: 10 attempts / minute / IP (throttler) and per account: 5 failures → locked 15 min (doubling, max 24 h) → 423 `ACCOUNT_LOCKED` with `retryAt`. Unknown usernames and disabled accounts answer exactly like a wrong password (401 `INVALID_CREDENTIALS`) and cost the same time (dummy Argon2 verify).
+
+| Route | Body | Answer |
+|---|---|---|
+| `POST staff/auth/login` | `{ username, password }` | `{ status: 'ok', staff: StaffMe, csrfToken }` + cookie, or `{ status: 'mfa_required', challenge }` (no cookie; challenge 5 min, single use), or `{ status: 'mfa_enrollment_required', staff, csrfToken }` + restricted cookie, or `{ status: 'password_change_required', staff, csrfToken }` + restricted cookie |
+| `POST staff/auth/login/mfa` | `{ challenge, code }` or `{ challenge, recoveryCode }` | same as `ok` above (or a restricted status if a password change is pending). 401 `MFA_INVALID`; 5 wrong codes kill the challenge |
+| `GET staff/auth/session` | | `{ staff: StaffMe, csrfToken, restricted: null \| 'mfa_enrollment' \| 'password_change' }`; 401 `STAFF_SESSION_REQUIRED` when none (the panel then shows sign-in) |
+| `POST staff/auth/logout` | | 204, session revoked, cookie cleared |
+| `POST staff/auth/password` | `{ currentPassword, newPassword }` | 204; revokes every other session; clears `mustChangePassword` |
+| `POST staff/auth/mfa/setup` | `{ password }` | `{ secret (base32), otpauthUrl }` (pending until enabled; allowed in restricted mfa_enrollment) |
+| `POST staff/auth/mfa/enable` | `{ code }` | `{ recoveryCodes: string[10] }` shown once; session becomes unrestricted |
+| `POST staff/auth/mfa/recovery-codes` | `{ code }` | new `{ recoveryCodes }`, old ones void |
+| `POST staff/auth/mfa/disable` | `{ password, code }` | 204; 409 `MFA_REQUIRED_FOR_ROLE` for Owners |
+| `GET staff/auth/sessions` | | own sessions `[{ id, current, createdAt, lastSeenAt, userAgent }]` |
+| `DELETE staff/auth/sessions/:id` | | 204 (own only) |
+
+`StaffMe = { id, username, displayName, roles: string[], permissions: Permission[], mfaEnabled, mustChangePassword, lastLoginAt }`.
+Password policy: 12 to 128 characters, not containing the username, not in a small built-in common-password list → 400 `WEAK_PASSWORD` with `details`.
+Restricted sessions can only call `staff/auth/session`, `logout`, `password` and `mfa/setup|enable`.
+
+## 3. Staff and roles (Owner-only permissions)
+| Route | Permission | Notes |
+|---|---|---|
+| `GET admin/staff` | `staff.read` | `[{ id, username, displayName, roles, disabled, mfaEnabled, mustChangePassword, lockedUntil, lastLoginAt, createdAt }]` |
+| `POST admin/staff` | `staff.manage` | `{ username (3..40, [a-z0-9._-]), displayName, roles }` → `{ staff, temporaryPassword }` (server-generated, shown once, `mustChangePassword: true`). 409 `USERNAME_TAKEN` |
+| `PATCH admin/staff/:id` | `staff.manage` | `{ displayName?, roles? }`. A role change revokes that account's sessions. 409 `SELF_ROLE_CHANGE` on your own roles; 409 `LAST_OWNER` if it would leave no active Owner. Adding Owner forces MFA enrollment at next sign-in |
+| `POST admin/staff/:id/disable` / `enable` | `staff.manage` | disable revokes sessions; 409 `SELF_ACTION`; 409 `LAST_OWNER` |
+| `POST admin/staff/:id/reset-password` | `staff.manage` | `{ temporaryPassword }` once; revokes sessions; `mustChangePassword` |
+| `POST admin/staff/:id/reset-mfa` | `staff.manage` | clears TOTP and recovery codes; revokes sessions (Owner re-enrolls at sign-in) |
+| `GET admin/staff/:id/sessions`, `DELETE admin/staff/:id/sessions` | `staff.read` / `staff.manage` | revoke all |
+| `GET admin/permissions` | `staff.read` | the catalog with groups, labels, `ownerOnly` |
+| `GET admin/roles` | `staff.read` | built-in + custom `[{ key, name, description, permissions, builtin, holders }]` |
+| `POST admin/roles` | `roles.manage` | `{ key ([a-z][a-z0-9_]{2,39}), name, description?, permissions }`; 400 `INVALID_PERMISSIONS` (`customRoleProblems`) |
+| `PATCH admin/roles/:key` / `DELETE admin/roles/:key` | `roles.manage` | built-ins can't change (409 `BUILTIN_ROLE`); a change revokes holders' sessions; delete only when nobody holds it (409 `ROLE_IN_USE`) |
+
+Every staff, role and session change is audited (`staff.*`, `role.*`), never with passwords, codes or secrets.
+
+## 4. Permissions on existing routes (replace every `@Roles(...)` with `@StaffRoute(...)`)
+| Routes | Permission |
+|---|---|
+| `GET admin/stats` | `dashboard.read` (each part is null unless the caller also holds that area's read permission) |
+| `GET admin/content*`, versions, changes, facets | `content.read` |
+| `POST admin/content`, `PUT/DELETE .../draft`, `POST admin/content/import` | `content.edit` |
+| `POST .../submit` | `content.submit` |
+| `POST .../approve`, `POST .../request-changes` | `content.approve` |
+| `POST .../unpublish`, `.../restore`, `.../rollback` | `content.unpublish` |
+| catalog item writes, `GET catalog/admin/items`, experiences writes, `PUT/DELETE ideas/:id/booking-link`, held-booking venue relay | `catalog.manage` |
+| `GET admin/users`, `GET admin/users/:id` | `users.read` (the detail's `safety` part only with `safety.read`, `support` part only with `support.read`) |
+| `POST admin/users/:id/sign-out` | `users.signout` |
+| `POST .../suspend`, `.../unsuspend` | `users.suspend` |
+| `PUT .../tags` | `users.tags` |
+| `POST .../unlink` | `users.unlink` |
+| `DELETE admin/users/:id` | `users.delete` |
+| `POST/DELETE .../plus` | `users.plus` |
+| support routes | see §5 |
+| `GET admin/safety/*` | `safety.read` (each list and detail view writes an audit entry `safety.view`) |
+| `POST admin/safety/flags/:id/*` | `safety.handle` |
+| `GET admin/ai/settings*` | `ai.read`; `PUT`, rollback: `ai.edit`; `POST admin/ai/test`: `ai.test` |
+| `GET admin/integrations/*` | `integrations.read`; writes: `integrations.manage` |
+| `GET admin/audit` | `audit.read` |
+| Remote Config | see §6 |
+The old `GET admin/me` is removed (use `staff/auth/session`). Content approval keeps every rule (clinician gate = `content.approve`, `expectedRev`, provenance, held acknowledgement, `selfApproved` recorded when the approver last edited the draft). Actor ids in content, audit and AI logs become `staff:<id>` with `byName` (display name) instead of an email. `STAFF_ACCOUNT` / `SELF_ACTION` checks against app users are gone (staff are not app users).
+
+## 5. Support workflow
+Statuses `open | in_progress | waiting_for_user | resolved | closed` (migration: existing `open` → `open`, `closed` → `closed`). Priority `low | normal | high | urgent` (default `normal`). Assignee: a staff id or null.
+| Route | Permission |
+|---|---|
+| `GET support/tickets?status=&priority=&assignee=me\|unassigned\|<staffId>&userId=&q=&page=&limit=` | `support.read` |
+| `GET support/tickets/:id` | `support.read`: ticket + `timeline` (created, status, assignee, priority, note, reply events, oldest first) |
+| `GET support/tickets/:id/screenshot` | `support.read` |
+| `GET support/assignees` | `support.read`: active staff holding `support.read` `[{ id, displayName }]` |
+| `PUT support/tickets/:id/status` `{ status, expectedVersion }` | `support.resolve` |
+| `PUT support/tickets/:id/assignee` `{ staffId \| null, expectedVersion }` | `support.assign` (assignee must hold `support.read`) |
+| `PUT support/tickets/:id/priority` `{ priority, expectedVersion }` | `support.prioritize` |
+| `POST support/tickets/:id/notes` `{ text 1..4000 }` | `support.note`: internal, never sent |
+| `POST support/tickets/:id/replies` `{ text 1..8000 }` | `support.reply`: creates a reply with `delivery: { status: 'pending' \| 'sent' \| 'failed', provider, attempts, lastError, sentAt }` |
+| `POST support/tickets/:id/replies/:replyId/retry` | `support.reply` |
+Tickets carry `version` (409 `TICKET_CONFLICT` on a stale `expectedVersion`). Replies go out through a `SupportReplySender` port that uses the configured email provider. Without a real provider (`EMAIL_DRIVER=log`, today's only driver) a reply stays **`pending` with `lastError: 'NO_EMAIL_PROVIDER'`** and `GET support/delivery-status` answers `{ provider: 'none', canSend: false }` so the panel shows the dependency. Only a provider's acceptance marks a reply `sent`. Timeline entries never include the user's email address in the panel; the reply goes to the account's email server-side. Status changes, assignment, priority, notes and replies are audited (never with text).
+
+## 6. Remote Config (`app-config` module)
+Public, read-only (no auth): `GET app-config` → `{ version, features: Record<FeatureKey, boolean>, maintenance: { enabled, message \| null }, minVersion \| null, recommendedVersion \| null, publishedAt }` with `Cache-Control: public, max-age=60`. Only public fields; no secrets ever.
+Admin:
+| Route | Permission |
+|---|---|
+| `GET admin/app-config` | `config.read`: `{ draft, published, features: [{ key, label, description }], updatedAt, updatedBy }` |
+| `PUT admin/app-config/draft` `{ config, baseVersion }` | `config.edit` |
+| `POST admin/app-config/publish` `{ note?, baseVersion }` | `config.publish`: the draft becomes the next published version |
+| `GET admin/app-config/versions?page=` | `config.read` |
+| `POST admin/app-config/rollback` `{ version, note?, baseVersion }` | `config.rollback`: republishes an earlier version as a new version |
+FeatureKey: only features that exist in the app today and that the app can switch off cleanly (the builder verifies each in app code and lists the evidence). A switch only removes or hides; it never grants access, skips consent, or changes subscription entitlements, and the API keeps its own checks. Maintenance message ≤ 280 chars. Versions are `x.y.z`. Default published config (migration seed) = everything on, no maintenance, no version limits.
+The app fetches `GET app-config` at start and when it returns to the foreground, caches the last valid config, shows a maintenance screen when enabled, an update-required screen below `minVersion`, an update suggestion below `recommendedVersion`, and hides switched-off entry points.
+
+## 7. Staff AI separation
+`POST admin/ai/test` (`ai.test`) never reads app-user data (no profiles, chats, safety data); test runs are not stored in chat collections and are audited without the text. Optional context: `{ contentId }` adds that item's **published** snapshot (read-only) to the test prompt. The panel's AI can never write content; suggestions go through the normal draft and review flow.
+
+## 8. Audit
+`audit.recorded` keeps its shape; `actor` = `staff:<id>` (plus `actorName` in views), `apikey:<name>` or `system`. Never passwords, codes, tokens, secrets, ticket text, note text or chat text.
+
+## 9. Environment (names only; no defaults for secrets)
+`PANEL_ORIGINS`, `STAFF_COOKIE_SECURE`, `STAFF_COOKIE_SAMESITE`, `STAFF_SESSION_IDLE_MINUTES`, `STAFF_SESSION_MAX_HOURS`, `STAFF_BOOTSTRAP_OWNER_USERNAME`, `STAFF_BOOTSTRAP_OWNER_PASSWORD`, `STAFF_BOOTSTRAP_OWNER_DISPLAY_NAME`, `EMAIL_DRIVER` (`log` only today). Removed: `ADMIN_EMAILS`, `CLINICIAN_EMAILS` (warning if set). Panel: `VITE_API_URL` (required for production builds; must be https unless localhost); `VITE_API_MOCKS` is refused by production builds.
+
+
+---
+
+<!-- backend/docs/ADMIN_API.md (STAFF_API.md replaces its Roles, panel Auth and support sections) -->
 
 # Thirdwheel Admin API · shared contract (v1)
 
