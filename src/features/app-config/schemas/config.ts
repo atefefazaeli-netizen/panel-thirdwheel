@@ -2,7 +2,8 @@ import { z } from 'zod';
 import type { AppConfigBody } from '../api/types';
 
 export const MAINTENANCE_MAX = 280;
-export const VERSION_RE = /^\d+\.\d+\.\d+$/;
+/** x.y.z, numbers only, no leading zeros, up to 9999 each (the backend's APP_VERSION_RE). */
+export const VERSION_RE = /^(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})$/;
 
 /** -1, 0 or 1 for two `x.y.z` versions. */
 export function compareVersions(a: string, b: string): number {
@@ -17,7 +18,7 @@ export function compareVersions(a: string, b: string): number {
 const optionalVersion = z
   .string()
   .trim()
-  .refine((v) => v === '' || VERSION_RE.test(v), 'Use the form x.y.z, for example 1.4.0.');
+  .refine((v) => v === '' || VERSION_RE.test(v), 'Use the form x.y.z, for example 1.4.0 (no leading zeros).');
 
 /** The draft editor's form (empty strings for "no limit"). */
 export const configFormSchema = z
@@ -43,7 +44,7 @@ export const configFormSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['recommendedVersion'],
-        message: 'The recommended version cannot be below the minimum version.',
+        message: 'The recommended version must be the same as or newer than the minimum version.',
       });
   });
 export type ConfigFormValues = z.infer<typeof configFormSchema>;

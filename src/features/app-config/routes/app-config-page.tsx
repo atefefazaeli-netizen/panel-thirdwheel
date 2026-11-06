@@ -22,7 +22,7 @@ import { Form } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { errorMessage } from '@/lib/api';
+import { ApiError, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { cleanSearch } from '@/lib/search';
 import { useCan } from '@/stores/session';
@@ -34,7 +34,7 @@ import {
   useRollbackConfig,
   useSaveConfigDraft,
 } from '../api/queries';
-import type { AppConfigAdmin, ConfigVersion } from '../api/types';
+import type { AppConfigAdmin, AppConfigBody, ConfigVersion } from '../api/types';
 import { configDiff } from '../lib/diff';
 import {
   configFormSchema,
@@ -47,6 +47,18 @@ import {
 } from '../schemas/config';
 
 const route = getRouteApi('/_app/app-config');
+
+/** What the app gets now: the published config, or every server feature on before any publish. */
+function liveConfig(view: AppConfigAdmin): AppConfigBody {
+  return (
+    view.published?.config ?? {
+      features: Object.fromEntries(view.features.map((f) => [f.key, true])),
+      maintenance: { enabled: false, message: null },
+      minVersion: null,
+      recommendedVersion: null,
+    }
+  );
+}
 
 export function AppConfigPage() {
   const cfg = useAppConfig();
@@ -61,11 +73,7 @@ export function AppConfigPage() {
       ) : !cfg.data ? (
         <Skeleton className="h-96" />
       ) : (
-        <Editor
-          key={`${cfg.data.published.version}:${cfg.data.updatedAt ?? ''}`}
-          data={cfg.data}
-          onReload={() => void cfg.refetch()}
-        />
+        <Editor key={cfg.data.draft.version} data={cfg.data} onReload={() => void cfg.refetch()} />
       )}
       <HistoryCard current={cfg.data} />
     </>
@@ -77,7 +85,7 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
   const keys = data.features.map((f) => f.key);
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configFormSchema),
-    defaultValues: toForm(data.draft, keys),
+    defaultValues: toForm(data.draft.config, keys),
     mode: 'onChange',
   });
   const { isDirty } = useFormState({ control: form.control });
@@ -85,10 +93,16 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
   const [publishOpen, setPublishOpen] = React.useState(false);
   const save = useSaveConfigDraft();
   const publish = usePublishConfig();
-  const baseVersion = data.published.version;
+  // The concurrency token is the DRAFT's version: every draft save, publish and rollback bumps it.
+  const baseVersion = data.draft.version;
+  const liveVersion = data.published?.version ?? 0;
+  const live = liveConfig(data);
+  const [serverProblems, setServerProblems] = React.useState<string[] | null>(null);
 
   // What publishing would change: the saved draft against the published config.
-  const changes = configDiff(data.published, data.draft, data.features);
+  // In words for people; the server's `changed` decides whether there is anything to publish.
+  const changes = configDiff(live, data.draft.config, data.features);
+  const publishable = data.draft.changed.length > 0;
 
   const onConflict = (e: unknown) => {
     if (isConfigConflict(e)) setConflict(true);
@@ -96,16 +110,33 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
   };
 
   const onSave = form.handleSubmit(async (v) => {
+    setServerProblems(null);
     try {
       await save.mutateAsync({ config: fromForm(v), baseVersion });
       toast.success('Draft saved. Nothing changes in the app until you publish.');
     } catch (e) {
+      // 400 INVALID_CONFIG lists every problem in `details`.
+      if (e instanceof ApiError && e.code === 'INVALID_CONFIG' && Array.isArray(e.details))
+        setServerProblems(e.details as string[]);
       onConflict(e);
     }
   });
 
   return (
     <>
+      {serverProblems && serverProblems.length > 0 && (
+        <Alert variant="destructive">
+          <TriangleAlertIcon />
+          <AlertTitle>The server did not accept the draft</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc pl-4">
+              {serverProblems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
       {conflict && (
         <Alert variant="destructive">
           <TriangleAlertIcon />
@@ -126,14 +157,17 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
               Draft
               {isDirty ? (
                 <StatusBadge status="editing" label="Unsaved edits" />
-              ) : changes.length ? (
+              ) : publishable ? (
                 <StatusBadge status="in_review" label="Differs from published" />
               ) : (
                 <StatusBadge status="published" label="Same as published" />
               )}
             </CardTitle>
             <CardDescription>
-              Based on published version {baseVersion}
+              Draft version {baseVersion} ·{' '}
+              {data.published
+                ? `live: version ${liveVersion}`
+                : 'nothing published yet: the app gets the default (version 0)'}
               {data.updatedAt && (
                 <>
                   {' '}
@@ -221,10 +255,12 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
         <Card className="h-fit">
           <CardHeader>
             <CardTitle>Changes to publish</CardTitle>
-            <CardDescription>The saved draft compared with published version {baseVersion}.</CardDescription>
+            <CardDescription>
+              The saved draft compared with {data.published ? `live version ${liveVersion}` : 'the default'}.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {changes.length === 0 ? (
+            {!publishable ? (
               <p className="text-sm text-muted-foreground">The saved draft is the same as the published config.</p>
             ) : (
               <ul className="flex flex-col gap-2 text-sm" aria-label="Changes to publish">
@@ -242,7 +278,7 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
             <Can perm="config.publish">
               <Button
                 onClick={() => setPublishOpen(true)}
-                disabled={changes.length === 0 || isDirty || publish.isPending || conflict}
+                disabled={!publishable || isDirty || publish.isPending || conflict}
                 className="self-start"
               >
                 <SendIcon />
@@ -255,15 +291,15 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
       <FormDialog<PublishValues>
         open={publishOpen}
         onOpenChange={setPublishOpen}
-        title={`Publish version ${baseVersion + 1}?`}
+        title={`Publish version ${liveVersion + 1}?`}
         description="The app picks it up at its next start or when it comes back to the foreground (within about a minute)."
         schema={publishSchema}
         defaultValues={{ note: '' }}
         submitLabel="Publish"
         onSubmit={async (v) => {
           try {
-            const p = await publish.mutateAsync({ baseVersion, note: v.note || undefined });
-            toast.success(`Published version ${p.version}`);
+            const view = await publish.mutateAsync({ baseVersion, note: v.note || undefined });
+            toast.success(`Published version ${view.published?.version ?? liveVersion + 1}`);
           } catch (e) {
             onConflict(e);
             if (isConfigConflict(e)) return;
@@ -295,7 +331,8 @@ function HistoryCard({ current }: { current: AppConfigAdmin | undefined }) {
   const rollback = useRollbackConfig();
   const [target, setTarget] = React.useState<ConfigVersion | null>(null);
   const [note, setNote] = React.useState('');
-  const live = current?.published.version;
+  const live = current?.published?.version ?? 0;
+  const liveCfg = current ? liveConfig(current) : null;
   const total = versions.data?.meta.totalPages ?? 1;
 
   return (
@@ -331,17 +368,27 @@ function HistoryCard({ current }: { current: AppConfigAdmin | undefined }) {
                       v{v.version} {v.version === live && <StatusBadge status="live" label="Live" />}
                     </TableCell>
                     <TableCell>{formatDateTime(v.publishedAt)}</TableCell>
-                    <TableCell>{v.publishedByName ?? v.publishedBy ?? 'System'}</TableCell>
+                    <TableCell>
+                      {v.publishedByName ?? (v.publishedBy === 'system' ? 'System' : v.publishedBy)}
+                    </TableCell>
                     <TableCell className="max-w-72 truncate text-muted-foreground">
+                      {v.kind === 'seed' ? 'Default config. ' : ''}
                       {v.rolledBackFrom ? `Rollback to v${v.rolledBackFrom}. ` : ''}
                       {v.note ?? ''}
                     </TableCell>
                     <TableCell className="text-right">
-                      {v.version !== live && current && (
+                      {v.version !== live && current && liveCfg && (
                         <Can perm="config.rollback">
                           <Button
                             variant="outline"
                             size="sm"
+                            // Rolling back to a config equal to the live one is 409 CONFIG_UNCHANGED.
+                            disabled={configDiff(liveCfg, v.config, current.features).length === 0}
+                            title={
+                              configDiff(liveCfg, v.config, current.features).length === 0
+                                ? 'Same as what is live'
+                                : undefined
+                            }
                             onClick={() => {
                               setNote('');
                               setTarget(v);
@@ -390,18 +437,18 @@ function HistoryCard({ current }: { current: AppConfigAdmin | undefined }) {
           open={!!target}
           onOpenChange={(o) => !o && setTarget(null)}
           title={`Roll back to version ${target.version}?`}
-          description={`Version ${target.version} is published again as version ${current.published.version + 1}. The app picks it up within about a minute.`}
+          description={`Version ${target.version} is published again as version ${live + 1}, and it also becomes the draft (unpublished draft edits are dropped). The app picks it up within about a minute.`}
           confirmLabel="Roll back"
-          cancelLabel={`Keep version ${current.published.version}`}
+          cancelLabel={`Keep version ${live}`}
           destructive
           onConfirm={async () => {
             try {
               const p = await rollback.mutateAsync({
                 version: target.version,
-                baseVersion: current.published.version,
+                baseVersion: current.draft.version,
                 note: note.trim() || undefined,
               });
-              toast.success(`Version ${target.version} is live again as version ${p.version}`);
+              toast.success(`Version ${target.version} is live again as version ${p.published?.version ?? live + 1}`);
             } catch (e) {
               toast.error(errorMessage(e));
               throw e;

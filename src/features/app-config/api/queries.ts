@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import { appConfigApi } from './app-config-api';
-import type { AppConfigBody } from './types';
+import type { AppConfigAdmin, AppConfigBody } from './types';
 
 export const appConfigKeys = {
   all: ['app-config'] as const,
@@ -20,36 +20,39 @@ export const useConfigVersions = (page: number) =>
 
 export const isConfigConflict = (e: unknown) => e instanceof ApiError && e.code === 'CONFIG_CONFLICT';
 
-function useInvalidate() {
+/**
+ * Each write answers the new view, which replaces the cached one (a new draft version remounts the
+ * editor). The history follows. A conflict does not reload by itself on a draft save, so the
+ * person's edits stay on screen until they choose "Load the latest"; publish and rollback have no
+ * local edits, so they reload at once.
+ */
+function useWrite<V>(fn: (v: V) => Promise<AppConfigAdmin>, reloadOnError: boolean) {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: appConfigKeys.all });
-}
-
-export function useSaveConfigDraft() {
-  const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (v: { config: AppConfigBody; baseVersion: number }) => appConfigApi.saveDraft(v.config, v.baseVersion),
+    mutationFn: fn,
     meta: { silent: true },
-    onSuccess: () => invalidate(),
+    onSuccess: (view) => {
+      qc.setQueryData(appConfigKeys.current(), view);
+      void qc.invalidateQueries({ queryKey: [...appConfigKeys.all, 'versions'] });
+    },
+    onError: () => {
+      if (reloadOnError) void qc.invalidateQueries({ queryKey: appConfigKeys.all });
+    },
   });
 }
 
-export function usePublishConfig() {
-  const invalidate = useInvalidate();
-  return useMutation({
-    mutationFn: (v: { baseVersion: number; note?: string }) => appConfigApi.publish(v.baseVersion, v.note),
-    meta: { silent: true },
-    // Also after a 409 CONFIG_CONFLICT: the page then shows what is published now.
-    onSettled: () => invalidate(),
-  });
-}
+export const useSaveConfigDraft = () =>
+  useWrite(
+    (v: { config: AppConfigBody; baseVersion: number }) => appConfigApi.saveDraft(v.config, v.baseVersion),
+    false,
+  );
 
-export function useRollbackConfig() {
-  const invalidate = useInvalidate();
-  return useMutation({
-    mutationFn: (v: { version: number; baseVersion: number; note?: string }) =>
+export const usePublishConfig = () =>
+  useWrite((v: { baseVersion: number; note?: string }) => appConfigApi.publish(v.baseVersion, v.note), true);
+
+export const useRollbackConfig = () =>
+  useWrite(
+    (v: { version: number; baseVersion: number; note?: string }) =>
       appConfigApi.rollback(v.version, v.baseVersion, v.note),
-    meta: { silent: true },
-    onSettled: () => invalidate(),
-  });
-}
+    true,
+  );

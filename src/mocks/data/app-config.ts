@@ -1,27 +1,49 @@
-// Mock Remote Config (STAFF_API.md §6): the published versions, the draft and the feature list.
-// The default published config (migration seed) is everything on, no maintenance, no limits.
+// Mock Remote Config, as built on feature/support-remote-config (STAFF_API.md §6): the published
+// versions (version 1 is the migration's seed: the default), the draft with its own version (the
+// `baseVersion` token) and the server's feature list. Development and tests only.
 import type { AppConfigBody, ConfigVersion, FeatureInfo } from '@/features/app-config/api/types';
 import { daysAgo } from '../utils';
 import { staffId } from './staff';
 
-/** Features the app can switch off cleanly (the server's list; the panel shows whatever it sends). */
+/** The backend's FEATURES (modules/app-config/domain/app-config.ts), word for word. */
 export const MOCK_FEATURES: FeatureInfo[] = [
-  { key: 'thirdEar', label: 'Third Ear', description: 'The Third Ear chat tab and its entry points.' },
-  { key: 'liveGames', label: 'Live games', description: 'Games played on two phones at once.' },
-  { key: 'memories', label: 'Memories', description: 'Adding photos to Memories in Us.' },
-  { key: 'league', label: 'Couple league', description: 'The league card and screen in Us.' },
-  { key: 'suggestGame', label: 'Suggest a game', description: 'The "Add a game" form in Explore.' },
+  {
+    key: 'thirdEar',
+    label: 'Third Ear',
+    description:
+      'The AI companion: the tab bar pill, follow-up chips in quizzes and games, Ask the stars. Off: hidden, and the API refuses Third Ear messages and cards.',
+  },
+  {
+    key: 'spicy',
+    label: 'Spicy',
+    description:
+      'Spicy decks and games in Explore, Spicy suggestions in Third Ear, explicit lip-sync songs and the Spicy row in Preferences. Off: hidden for everyone; nobody’s own switch changes.',
+  },
+  {
+    key: 'calendar',
+    label: 'Calendar',
+    description:
+      'Google Calendar connect: the Plans banner and Settings › Calendar. Off: hidden for people not connected; connected people can still disconnect.',
+  },
 ];
 
-export interface AppConfigState {
-  versions: ConfigVersion[];
-  draft: AppConfigBody;
+export interface AppConfigDraft {
+  config: AppConfigBody;
+  /** The concurrency token: every draft save, publish and rollback bumps it. */
+  version: number;
   updatedAt: string | null;
   updatedBy: string | null;
   updatedByName: string | null;
 }
 
-export const allOn = (): AppConfigBody => ({
+export interface AppConfigState {
+  versions: ConfigVersion[];
+  /** null until someone saves a draft: the draft is then the live config at version 0. */
+  draft: AppConfigDraft | null;
+}
+
+/** Every feature on, no maintenance, no version limits. */
+export const defaultConfig = (): AppConfigBody => ({
   features: Object.fromEntries(MOCK_FEATURES.map((f) => [f.key, true])),
   maintenance: { enabled: false, message: null },
   minVersion: null,
@@ -29,31 +51,30 @@ export const allOn = (): AppConfigBody => ({
 });
 
 export function seedAppConfig(): AppConfigState {
-  const v1 = allOn();
-  const v2: AppConfigBody = { ...allOn(), recommendedVersion: '1.3.0' };
   const owner = `staff:${staffId('owner')}`;
   return {
     versions: [
       {
         version: 1,
-        config: v1,
-        publishedAt: daysAgo(20),
-        publishedBy: null,
+        config: defaultConfig(),
+        kind: 'seed',
+        note: null,
+        rolledBackFrom: null,
+        publishedBy: 'system',
         publishedByName: null,
-        note: 'Default config (migration seed).',
+        publishedAt: daysAgo(20),
       },
       {
         version: 2,
-        config: v2,
-        publishedAt: daysAgo(6),
+        config: { ...defaultConfig(), recommendedVersion: '1.3.0' },
+        kind: 'publish',
+        note: 'Suggest 1.3.0 (Explore fixes).',
+        rolledBackFrom: null,
         publishedBy: owner,
         publishedByName: 'Rania Aziz',
-        note: 'Suggest 1.3.0 (Explore fixes).',
+        publishedAt: daysAgo(6),
       },
     ],
-    draft: structuredClone(v2),
-    updatedAt: null,
-    updatedBy: null,
-    updatedByName: null,
+    draft: null,
   };
 }
