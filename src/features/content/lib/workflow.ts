@@ -1,6 +1,7 @@
-// Which workflow buttons the item editor shows, per role and state (ADMIN_API.md › Content):
-// admins save, discard and submit drafts, unpublish and restore; clinicians approve and request
-// changes on a draft in review. An account with both roles sees both sets.
+// Which workflow buttons the item editor shows, per permission and state (STAFF_API.md §4 and
+// ADMIN_API.md › Content): content.edit saves and discards drafts, content.submit sends them for
+// review, content.unpublish unpublishes and restores, content.approve approves and requests changes
+// on a draft in review (the clinician gate). The permissions come from the server's session.
 import type { ContentItem } from '../api/types';
 
 export type WorkflowAction = 'save' | 'discard' | 'submit' | 'approve' | 'requestChanges' | 'unpublish' | 'restore';
@@ -20,11 +21,13 @@ const off = (reason: string): ActionState => ({ visible: true, enabled: false, r
 
 export function workflowFor(
   item: Pick<ContentItem, 'draft' | 'retired' | 'liveVersion'>,
-  roles: readonly string[],
+  permissions: readonly string[],
   opts: { dirty: boolean; valid?: boolean; busy?: boolean; stale?: boolean },
 ): Workflow {
-  const admin = roles.includes('admin');
-  const clinician = roles.includes('clinician');
+  const edit = permissions.includes('content.edit');
+  const submit = permissions.includes('content.submit');
+  const unpublish = permissions.includes('content.unpublish');
+  const approve = permissions.includes('content.approve');
   const state = item.draft?.state ?? null;
   const busy = !!opts.busy;
   // Someone else changed the item: every write waits until the latest is loaded.
@@ -39,17 +42,19 @@ export function workflowFor(
     restore: hidden,
   };
 
-  if (admin) {
+  if (edit) {
     wf.save = stale
       ? off('Changed by someone else: load the latest first')
       : !opts.dirty
-      ? off('No changes to save')
-      : opts.valid === false
-        ? off('Fix the errors first')
-        : busy
-          ? off('Working')
-          : on;
+        ? off('No changes to save')
+        : opts.valid === false
+          ? off('Fix the errors first')
+          : busy
+            ? off('Working')
+            : on;
     if (state || opts.dirty) wf.discard = busy ? off('Working') : on;
+  }
+  if (submit) {
     if (state !== 'in_review') {
       wf.submit =
         !state && !opts.dirty
@@ -60,11 +65,13 @@ export function workflowFor(
               ? off('Working')
               : on;
     }
+  }
+  if (unpublish) {
     if (item.retired) wf.restore = busy ? off('Working') : on;
     else if (item.liveVersion > 0) wf.unpublish = busy ? off('Working') : on;
   }
 
-  if (clinician && state === 'in_review') {
+  if (approve && state === 'in_review') {
     wf.approve = stale
       ? off('Changed by someone else: load the latest and review it again')
       : opts.dirty

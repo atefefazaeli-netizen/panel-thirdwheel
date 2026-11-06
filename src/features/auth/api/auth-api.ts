@@ -1,60 +1,70 @@
-// Panel sign-in uses the app's auth routes (backend auth.controller.ts): an email code with
-// `login/start` → `verify`, `refresh` and `logout`; then `GET admin/me`. A staff member whose
-// email has no account yet (first sign-in, never used the app) gets one through `signup/start`;
-// roles come from ADMIN_EMAILS / CLINICIAN_EMAILS, so anyone else still sees "no panel access".
-import { api, getRefreshToken, type TokenPair } from '@/lib/api';
-import type { StaffUser } from '@/stores/session';
+// Staff sign-in and account routes (STAFF_API.md §2). Username and password only; the session is
+// an HttpOnly cookie set by the API, and the CSRF token in each answer is kept in memory by the
+// API client. Sign-in routes pass `auth: false` (a 401 there is a wrong password, not an expired
+// session).
+import { acceptSession, api, endSession, SESSION_PATH, type SessionInfo } from '@/lib/api';
+import type { StaffMe } from '@/stores/session';
 
-export type StartResult =
-  { ok: true; session: string; resendAt: number } | { ok: false; reason: 'exists' | 'not_found' | 'unchanged' };
+export type LoginResult =
+  | { status: 'ok'; staff: StaffMe; csrfToken: string }
+  | { status: 'mfa_required'; challenge: string }
+  | { status: 'mfa_enrollment_required'; staff: StaffMe; csrfToken: string }
+  | { status: 'password_change_required'; staff: StaffMe; csrfToken: string };
 
-export type CodeFailure = 'CODE_INCORRECT' | 'CODE_LOCKED' | 'CODE_EXPIRED' | 'SESSION_NOT_FOUND';
+export interface MfaSetup {
+  /** Base32 TOTP secret, pending until `mfa/enable`. */
+  secret: string;
+  otpauthUrl: string;
+}
 
-/**
- * Since API v1.6.0 (adults-only sign-up) a new account is not created by the code check: verify
- * answers `birthdayRequired` with a single-use ticket, and `signup/complete` creates the account
- * only for an 18+ birthday (403 UNDER_18 stores nothing). A staff member signing in to the panel
- * for the first time goes through the same step.
- */
-export type BirthdayRequired = {
-  ok: true;
-  mode: 'signup';
-  birthdayRequired: true;
-  ticket: string;
-  ticketExpiresAt: number;
-};
+export interface OwnSession {
+  id: string;
+  current: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+  userAgent: string | null;
+}
 
-export type VerifyResult =
-  | ({ ok: true; mode: 'signup' | 'login'; userId: string } & TokenPair)
-  | BirthdayRequired
-  | { ok: false; attempts: number; locked: boolean; code: CodeFailure };
+/** The restriction a login answer puts on the new session. */
+export function restrictionOf(r: LoginResult): SessionInfo['restricted'] {
+  if (r.status === 'mfa_enrollment_required') return 'mfa_enrollment';
+  if (r.status === 'password_change_required') return 'password_change';
+  return null;
+}
 
-export type SignupResult = { ok: true; mode: 'signup' | 'login'; isNew: boolean; userId: string } & TokenPair;
-
-export const needsBirthday = (r: VerifyResult): r is BirthdayRequired =>
-  r.ok && 'birthdayRequired' in r && r.birthdayRequired === true;
-
-/** The device's local date, YYYY-MM-DD (the API counts age in the person's own day). */
-export function localToday(now = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+/** Records a login answer that carries a session (every status but mfa_required). */
+export function acceptLogin(r: LoginResult): void {
+  if (r.status === 'mfa_required') return;
+  acceptSession({ staff: r.staff, csrfToken: r.csrfToken, restricted: restrictionOf(r) });
 }
 
 export const authApi = {
-  startLogin: (email: string) => api.post<StartResult>('auth/login/start', { email }, { auth: false }),
-  startSignup: (email: string) => api.post<StartResult>('auth/signup/start', { email }, { auth: false }),
-  /** Log in, or create the account on a first sign-in. */
-  start: async (email: string): Promise<StartResult> => {
-    const r = await authApi.startLogin(email);
-    return !r.ok && r.reason === 'not_found' ? authApi.startSignup(email) : r;
+  login: async (username: string, password: string) => {
+    const r = await api.post<LoginResult>('staff/auth/login', { username, password }, { auth: false });
+    acceptLogin(r);
+    return r;
   },
-  verify: (session: string, code: string) => api.post<VerifyResult>('auth/verify', { session, code }, { auth: false }),
-  completeSignup: (ticket: string, birthday: string, today = localToday()) =>
-    api.post<SignupResult>('auth/signup/complete', { ticket, birthday, today }, { auth: false }),
-  resend: (session: string) => api.post<{ resendAt: number }>('auth/resend', { session }, { auth: false }),
-  me: () => api.get<StaffUser>('admin/me'),
+  loginMfa: async (challenge: string, proof: { code: string } | { recoveryCode: string }) => {
+    const r = await api.post<LoginResult>('staff/auth/login/mfa', { challenge, ...proof }, { auth: false });
+    acceptLogin(r);
+    return r;
+  },
+  /** The current session; 401 STAFF_SESSION_REQUIRED when there is none. */
+  session: async () => acceptSession(await api.get<SessionInfo>(SESSION_PATH, { auth: false })),
   logout: async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) await api.post<void>('auth/logout', { refreshToken }, { auth: false });
+    try {
+      await api.post<void>('staff/auth/logout', undefined, { auth: false });
+    } finally {
+      endSession('signed_out');
+    }
   },
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post<void>('staff/auth/password', { currentPassword, newPassword }),
+  mfaSetup: (password: string) => api.post<MfaSetup>('staff/auth/mfa/setup', { password }),
+  mfaEnable: (code: string) => api.post<{ recoveryCodes: string[] }>('staff/auth/mfa/enable', { code }),
+  regenerateRecoveryCodes: (code: string) =>
+    api.post<{ recoveryCodes: string[] }>('staff/auth/mfa/recovery-codes', { code }),
+  mfaDisable: (password: string, code: string) => api.post<void>('staff/auth/mfa/disable', { password, code }),
+  sessions: () => api.get<OwnSession[]>('staff/auth/sessions'),
+  revokeSession: (id: string) => api.delete<void>(`staff/auth/sessions/${encodeURIComponent(id)}`),
 };

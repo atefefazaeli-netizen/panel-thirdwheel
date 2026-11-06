@@ -6,8 +6,8 @@ import { renderRoute } from '@/test/utils';
 
 // Typing-heavy: allow for a busy CI machine (the 5 s default timed out under load on a clean checkout too).
 describe('AI engine (mock API)', { timeout: 20_000 }, () => {
-  it('clinicians read only: no save bar and no test console', async () => {
-    renderRoute('/ai-engine', { roles: ['clinician'] });
+  it('ai.read only (analyst): read only, no save bar and no test console', async () => {
+    renderRoute('/ai-engine', { roles: ['analyst'] });
     expect(await screen.findByText('Read only')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Save as new version/ })).toBeNull();
     expect(screen.queryByText('Test console')).toBeNull();
@@ -15,7 +15,7 @@ describe('AI engine (mock API)', { timeout: 20_000 }, () => {
   });
 
   it('disables a provider whose key is missing and says why', async () => {
-    renderRoute('/ai-engine', { roles: ['admin'] });
+    renderRoute('/ai-engine', { roles: ['owner'] });
     const openai = await screen.findByRole('radio', { name: /OpenAI/ });
     expect(openai).toBeDisabled();
     expect(within(openai).getByText('Set OPENAI_API_KEY on the API to use this')).toBeInTheDocument();
@@ -24,7 +24,7 @@ describe('AI engine (mock API)', { timeout: 20_000 }, () => {
 
   it('edits a task line, shows the diff against the default, resets and saves a new version', async () => {
     const user = userEvent.setup();
-    renderRoute('/ai-engine', { roles: ['admin'] });
+    renderRoute('/ai-engine', { roles: ['owner'] });
     const box = await screen.findByRole('textbox', { name: 'Name my feelings' });
     await user.clear(box);
     await user.type(box, 'Help them name what they feel in one word.');
@@ -42,7 +42,7 @@ describe('AI engine (mock API)', { timeout: 20_000 }, () => {
 
   it('runs the test console and flags risky text', async () => {
     const user = userEvent.setup();
-    renderRoute('/ai-engine', { roles: ['admin'] });
+    renderRoute('/ai-engine', { roles: ['owner'] });
     await user.type(
       await screen.findByRole('textbox', { name: 'Message' }),
       'He never listens when I talk about work.',
@@ -57,9 +57,41 @@ describe('AI engine (mock API)', { timeout: 20_000 }, () => {
     expect(await screen.findByText('Safety reply (risk check)')).toBeInTheDocument();
   });
 
+  it('says the console has no access to user data, and can add published content as context', async () => {
+    const user = userEvent.setup();
+    const bodies: Record<string, unknown>[] = [];
+    const { server } = await import('@/mocks/node');
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/admin/ai/test'))
+        void request
+          .clone()
+          .json()
+          .then((b) => bodies.push(b));
+    });
+    renderRoute('/ai-engine', { roles: ['owner'] });
+    expect(
+      await screen.findByText(/The console has no access to user data: no profiles, chats or safety data/),
+    ).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'How do we start?');
+    await user.click(screen.getByRole('switch', { name: /Use published content as context/ }));
+    await user.click(screen.getByRole('button', { name: 'Run' }));
+    expect(await screen.findByText(/Pick a content item/)).toBeInTheDocument();
+    await user.type(screen.getByRole('combobox', { name: 'Content id' }), 'blind-taste-test');
+    await user.click(screen.getByRole('button', { name: 'Run' }));
+    expect(await screen.findByText(/Context: the published/)).toBeInTheDocument();
+    server.events.removeAllListeners();
+    expect(bodies.at(-1)).toMatchObject({
+      mode: expect.any(String),
+      text: 'How do we start?',
+      contentId: 'blind-taste-test',
+    });
+    // The audit entry never holds the text.
+    expect(JSON.stringify(db().audit.filter((a) => a.action === 'ai.test'))).not.toContain('How do we start?');
+  });
+
   it('labels built-in copy as fallback, never as a model reply', async () => {
     const user = userEvent.setup();
-    renderRoute('/ai-engine', { roles: ['admin'] });
+    renderRoute('/ai-engine', { roles: ['owner'] });
     await user.click(await screen.findByRole('switch', { name: /Fallback only/ }));
     await user.click(screen.getByRole('switch', { name: 'Use unsaved changes' }));
     await user.type(screen.getByRole('textbox', { name: 'Message' }), 'We argued about dishes.');
@@ -70,7 +102,7 @@ describe('AI engine (mock API)', { timeout: 20_000 }, () => {
 
   it('sends the version it edited; a save that lost to another admin is refused and explained', async () => {
     const user = userEvent.setup();
-    renderRoute('/ai-engine', { roles: ['admin'] });
+    renderRoute('/ai-engine', { roles: ['owner'] });
     const box = await screen.findByRole('textbox', { name: 'Name my feelings' });
     // Another admin saves while this page is open.
     const v = db().ai.versions.at(-1)!;

@@ -1,7 +1,7 @@
 import { EyeIcon, RotateCcwIcon } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { ConfirmDialog, DrawerPreview, ErrorState, RoleGate } from '@/components/shared';
+import { ConfirmDialog, DrawerPreview, ErrorState, Can } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +57,7 @@ export function HistoryCard({ currentVersion }: { currentVersion: number }) {
                     {h.settings.fallbackOnly && <span className="text-muted-foreground"> · fallback only</span>}
                   </TableCell>
                   <TableCell className="max-w-72 truncate whitespace-normal">{h.note}</TableCell>
-                  <TableCell>{h.updatedByEmail ?? h.updatedBy ?? 'Environment'}</TableCell>
+                  <TableCell>{h.updatedByName ?? h.updatedByEmail ?? h.updatedBy ?? 'Environment'}</TableCell>
                   <TableCell title={formatDateTime(h.updatedAt)}>{formatRelative(h.updatedAt)}</TableCell>
                   <TableCell className="pr-6">
                     <div className="flex justify-end gap-1">
@@ -66,12 +66,12 @@ export function HistoryCard({ currentVersion }: { currentVersion: number }) {
                         View
                       </Button>
                       {h.version !== currentVersion && (
-                        <RoleGate allow="admin">
+                        <Can perm="ai.edit">
                           <Button variant="outline" size="sm" onClick={() => setTarget(h)}>
                             <RotateCcwIcon />
                             Roll back
                           </Button>
-                        </RoleGate>
+                        </Can>
                       )}
                     </div>
                   </TableCell>

@@ -10,7 +10,7 @@ import { renderRoute } from '@/test/utils';
 
 describe('safety (mock API)', () => {
   it('shows the summary and filters open high flags from the URL', async () => {
-    renderRoute('/safety?status=open&level=high', { roles: ['clinician'] });
+    renderRoute('/safety?status=open&level=high', { roles: ['safety_reviewer'] });
     const table = await screen.findByRole('table', { name: 'Safety flags' });
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
     expect(within(table).getByText('priya@example.com')).toBeInTheDocument();
@@ -19,7 +19,7 @@ describe('safety (mock API)', () => {
 
   it('opens a flag, says it is metadata only, adds a note and marks it reviewed', async () => {
     const user = userEvent.setup();
-    renderRoute('/safety?status=open&level=high', { roles: ['clinician'] });
+    renderRoute('/safety?status=open&level=high', { roles: ['safety_reviewer'] });
     await user.click(await screen.findByText('priya@example.com'));
     const drawer = await screen.findByRole('dialog');
     expect(within(drawer).getByText(/Thirdwheel never stores what was typed/)).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('safety (mock API)', () => {
   it('escalates with a note (at most 500 characters)', async () => {
     const user = userEvent.setup();
     const flag = db().safety.flags.find((f) => f.userId === uid('dev'))!;
-    renderRoute(`/safety/${flag.id}`, { roles: ['admin'] });
+    renderRoute(`/safety/${flag.id}`, { roles: ['owner'] });
     await user.click(await screen.findByRole('button', { name: 'Escalate' }));
     const dialog = await screen.findByRole('dialog', { name: 'Escalate this flag?' });
     await user.type(within(dialog).getByRole('textbox'), 'Third repeat today.');
@@ -60,7 +60,7 @@ describe('safety (mock API)', () => {
     const quizTotal = db().safety.flags.filter((f) => f.surface === 'quiz').length;
     const urls: string[] = [];
     server.events.on('request:start', ({ request }) => void urls.push(request.url));
-    renderRoute('/safety?surface=quiz&limit=10', { roles: ['clinician'] });
+    renderRoute('/safety?surface=quiz&limit=10', { roles: ['safety_reviewer'] });
     const table = await screen.findByRole('table', { name: 'Safety flags' });
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(11));
     server.events.removeAllListeners();
@@ -70,7 +70,7 @@ describe('safety (mock API)', () => {
 
   it('empty, error, permission-denied and partial states', async () => {
     const { cleanup } = await import('@testing-library/react');
-    renderRoute('/safety?surface=other&kind=heat&status=escalated', { roles: ['clinician'] });
+    renderRoute('/safety?surface=other&kind=heat&status=escalated', { roles: ['safety_reviewer'] });
     expect(await screen.findByText('No flags match')).toBeInTheDocument();
     cleanup();
 
@@ -79,7 +79,7 @@ describe('safety (mock API)', () => {
         HttpResponse.json({ statusCode: 500, message: 'Internal server error', requestId: 'r-500' }, { status: 500 }),
       ),
     );
-    renderRoute('/safety', { roles: ['clinician'] });
+    renderRoute('/safety', { roles: ['safety_reviewer'] });
     expect(await screen.findByText('Could not load this', {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     cleanup();
@@ -87,12 +87,12 @@ describe('safety (mock API)', () => {
     server.use(
       http.get(p('admin/safety/flags'), () =>
         HttpResponse.json(
-          { statusCode: 403, message: 'Insufficient role', code: 'INSUFFICIENT_ROLE' },
+          { statusCode: 403, message: 'Insufficient permission', code: 'INSUFFICIENT_PERMISSION' },
           { status: 403 },
         ),
       ),
     );
-    renderRoute('/safety', { roles: ['clinician'] });
+    renderRoute('/safety', { roles: ['safety_reviewer'] });
     expect(await screen.findByText('Not available for your role')).toBeInTheDocument();
     cleanup();
 
@@ -103,7 +103,7 @@ describe('safety (mock API)', () => {
         HttpResponse.json({ statusCode: 503, message: 'Unavailable' }, { status: 503 }),
       ),
     );
-    renderRoute('/safety?status=open&level=high', { roles: ['clinician'] });
+    renderRoute('/safety?status=open&level=high', { roles: ['safety_reviewer'] });
     const table = await screen.findByRole('table', { name: 'Safety flags' });
     expect(await within(table).findByText('priya@example.com')).toBeInTheDocument();
     expect(await screen.findByText('Could not load this', {}, { timeout: 8000 })).toBeInTheDocument();

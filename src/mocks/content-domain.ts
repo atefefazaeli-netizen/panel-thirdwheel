@@ -54,9 +54,13 @@ const LIMITS = {
 } as const;
 
 export interface Actor {
+  /** `staff:<id>` (STAFF_API.md §4), `apikey:<name>` or `workbook`. */
   id: string;
   email: string | null;
-  roles: readonly string[];
+  /** Display name for views (`byName`). */
+  name?: string | null;
+  /** The session's permissions: the clinician gate is `content.approve`. */
+  permissions: readonly string[];
 }
 
 /** Stored item: the API view without its computed fields, plus the server-only revision. */
@@ -283,7 +287,7 @@ export function diffSummary(before: ContentSnapshot | null, after: ContentSnapsh
   return out;
 }
 
-const isClinician = (a: Actor) => a.roles.includes('clinician');
+const isClinician = (a: Actor) => a.permissions.includes('content.approve');
 const touch = (item: StoredItem, now: string, patch: Partial<StoredItem>): StoredItem => ({
   ...item,
   ...patch,
@@ -299,6 +303,7 @@ const entry = (
   action,
   by: actor.id,
   byEmail: actor.email,
+  byName: actor.name ?? null,
   note,
   at: now,
   meta,
@@ -345,7 +350,16 @@ export function createItem(
   return {
     item: {
       ...shell,
-      draft: { snapshot, state, note: cleanNote(note), by: actor.id, byEmail: actor.email, at: now, source },
+      draft: {
+        snapshot,
+        state,
+        note: cleanNote(note),
+        by: actor.id,
+        byEmail: actor.email,
+        byName: actor.name ?? null,
+        at: now,
+        source,
+      },
     },
     change: entry(source === 'n8n' || state === 'in_review' ? 'imported' : 'created', actor, now, cleanNote(note), {
       summary: ['new'],
@@ -365,6 +379,7 @@ export function saveDraft(item: StoredItem, snapshot: unknown, actor: Actor, now
         note: item.draft?.note ?? null,
         by: actor.id,
         byEmail: actor.email,
+        byName: actor.name ?? null,
         at: now,
         source: 'panel',
       },
@@ -421,13 +436,21 @@ export function approveDraft(
       livePublishedAt: now,
       liveApprovedBy: actor.id,
       liveApprovedByEmail: actor.email,
+      liveApprovedByName: actor.name ?? null,
       draft: null,
       provenance:
         p && cleared.length
           ? {
               ...p,
               needsReview: [],
-              clearedBy: { by: actor.id, byEmail: actor.email, at: now, version, via: 'approved' },
+              clearedBy: {
+                by: actor.id,
+                byEmail: actor.email,
+                byName: actor.name ?? null,
+                at: now,
+                version,
+                via: 'approved',
+              },
             }
           : p,
     }),
@@ -439,10 +462,12 @@ export function approveDraft(
       publishedAt: now,
       approvedBy: actor.id,
       approvedByEmail: actor.email,
+      approvedByName: actor.name ?? null,
       action: 'published',
       note: n,
       by: actor.id,
       byEmail: actor.email,
+      byName: actor.name ?? null,
       from: null,
     },
     publishes: 'published',
@@ -533,6 +558,7 @@ export function rollbackTo(
       note: n,
       by: actor.id,
       byEmail: actor.email,
+      byName: actor.name ?? null,
       from: target.version,
     },
     publishes: 'rolled_back',
@@ -560,6 +586,7 @@ export function importDraft(
         note: cleanNote(note),
         by: actor.id,
         byEmail: actor.email,
+        byName: actor.name ?? null,
         at: now,
         source,
       },

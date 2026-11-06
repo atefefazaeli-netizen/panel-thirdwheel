@@ -5,11 +5,10 @@ import { toast } from 'sonner';
 import {
   ConfirmDialog,
   DataTable,
-  ForbiddenState,
   FormDialog,
   FormFieldText,
   PageHeader,
-  RoleGate,
+  RequirePermission,
   type FacetedFilterConfig,
 } from '@/components/shared';
 import { Button } from '@/components/ui/button';
@@ -29,9 +28,9 @@ const route = getRouteApi('/_app/users/');
 
 export function UsersListPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="users" />}>
+    <RequirePermission perm="users.read" what="users">
       <UsersList />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 

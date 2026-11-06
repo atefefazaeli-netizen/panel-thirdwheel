@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { ConfirmDialog, EmptyState, ErrorState, SecretReveal, StatusBadge } from '@/components/shared';
+import { Can, ConfirmDialog, EmptyState, ErrorState, SecretReveal, StatusBadge } from '@/components/shared';
+import { useCan } from '@/stores/session';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +49,7 @@ type Dialog =
   | { kind: 'rotate'; webhook: Webhook };
 
 export function WebhooksTab({ onShowDeliveries }: { onShowDeliveries: (webhookId: string) => void }) {
+  const canManage = useCan('integrations.manage');
   const hooks = useWebhooks();
   const create = useCreateWebhook();
   const update = useUpdateWebhook();
@@ -72,10 +74,12 @@ export function WebhooksTab({ onShowDeliveries }: { onShowDeliveries: (webhookId
         <p className="text-sm text-muted-foreground">
           Outgoing events for n8n. Each webhook has its own signing secret.
         </p>
-        <Button onClick={() => setDialog({ kind: 'create' })}>
-          <PlusIcon />
-          New webhook
-        </Button>
+        <Can perm="integrations.manage">
+          <Button onClick={() => setDialog({ kind: 'create' })}>
+            <PlusIcon />
+            New webhook
+          </Button>
+        </Can>
       </div>
       {hooks.error ? (
         <ErrorState error={hooks.error} onRetry={() => void hooks.refetch()} />
@@ -99,39 +103,41 @@ export function WebhooksTab({ onShowDeliveries }: { onShowDeliveries: (webhookId
                 <CardDescription className="truncate font-mono text-xs" title={w.url}>
                   {w.url}
                 </CardDescription>
-                <CardAction>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${w.name}`}>
-                        <MoreHorizontalIcon />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuGroup>
-                        <DropdownMenuItem onSelect={() => setDialog({ kind: 'edit', webhook: w })}>
-                          <PencilIcon />
-                          Edit
+                {canManage && (
+                  <CardAction>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${w.name}`}>
+                          <MoreHorizontalIcon />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem onSelect={() => setDialog({ kind: 'edit', webhook: w })}>
+                            <PencilIcon />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => void sendTest(w)}>
+                            <SendIcon />
+                            Send test
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setDialog({ kind: 'rotate', webhook: w })}>
+                            <KeyRoundIcon />
+                            Rotate secret
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => setDialog({ kind: 'delete', webhook: w })}
+                        >
+                          <Trash2Icon />
+                          Delete
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => void sendTest(w)}>
-                          <SendIcon />
-                          Send test
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setDialog({ kind: 'rotate', webhook: w })}>
-                          <KeyRoundIcon />
-                          Rotate secret
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => setDialog({ kind: 'delete', webhook: w })}
-                      >
-                        <Trash2Icon />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardAction>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardAction>
+                )}
               </CardHeader>
               <CardContent className="flex flex-col gap-3 px-4">
                 <div className="flex flex-wrap gap-1">
@@ -153,7 +159,7 @@ export function WebhooksTab({ onShowDeliveries }: { onShowDeliveries: (webhookId
                     <Switch
                       id={`enabled-${w.id}`}
                       checked={w.enabled}
-                      disabled={update.isPending}
+                      disabled={update.isPending || !canManage}
                       onCheckedChange={(enabled) =>
                         void update.mutateAsync({ id: w.id, patch: { enabled } }).then(
                           () => toast.success(enabled ? 'Webhook enabled' : 'Webhook disabled'),

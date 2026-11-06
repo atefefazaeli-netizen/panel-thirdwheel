@@ -34,7 +34,7 @@ function alert(f: SafetyFlag, escalation?: { by: string; note: string | null }) 
 
 export const safetyHandlers = [
   http.post(p('safety/signals'), ({ request }) =>
-    guard(request, 'user', async (me) => {
+    guard(request, 'session', async (me) => {
       const body = await readJson<Record<string, unknown>>(request);
       const extra = Object.keys(body).filter((k) => !['kind', 'surface', 'helplineShown'].includes(k));
       if (extra.length) return badRequest(`property ${extra[0]} should not exist`);
@@ -80,7 +80,7 @@ export const safetyHandlers = [
   ),
 
   http.get(p('admin/safety/flags'), ({ request }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'safety.read', () => {
       const url = new URL(request.url);
       const q = url.searchParams;
       const surface = q.get('surface');
@@ -107,7 +107,7 @@ export const safetyHandlers = [
   ),
 
   http.get(p('admin/safety/summary'), ({ request }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'safety.read', () => {
       const flags = db().safety.flags;
       const open = flags.filter((f) => f.status === 'open');
       const since = (ms: number) => flags.filter((f) => Date.now() - Date.parse(f.lastAt) <= ms).length;
@@ -123,14 +123,14 @@ export const safetyHandlers = [
   ),
 
   http.get(p('admin/safety/flags/:id'), ({ request, params }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'safety.read', () => {
       const f = find(params.id);
       return f ? HttpResponse.json(f) : notFound();
     }),
   ),
 
   http.post(p('admin/safety/flags/:id/review'), ({ request, params }) =>
-    guard(request, 'staff', async (me) => {
+    guard(request, 'safety.handle', async (me) => {
       const f = find(params.id);
       if (!f) return notFound();
       const { note } = await readJson<{ note?: string }>(request);
@@ -152,7 +152,7 @@ export const safetyHandlers = [
   ),
 
   http.post(p('admin/safety/flags/:id/notes'), ({ request, params }) =>
-    guard(request, 'staff', async (me) => {
+    guard(request, 'safety.handle', async (me) => {
       const f = find(params.id);
       if (!f) return notFound();
       const { text } = await readJson<{ text?: string }>(request);
@@ -170,7 +170,7 @@ export const safetyHandlers = [
   ),
 
   http.post(p('admin/safety/flags/:id/escalate'), ({ request, params }) =>
-    guard(request, 'staff', async (me) => {
+    guard(request, 'safety.handle', async (me) => {
       const f = find(params.id);
       if (!f) return notFound();
       const { note } = await readJson<{ note?: string }>(request);

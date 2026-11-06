@@ -4,37 +4,45 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { checkProductionEnv } from './scripts/prod-guard.mjs';
 
 /**
- * Production builds without VITE_API_MOCKS=1 never start MSW, so the service worker file copied
- * from public/ is dead weight that could be registered later: leave it out. A build with mocks on
- * keeps it, and says loudly that it is a demo build (the app shows a permanent banner too).
+ * Production builds never contain the mock API: MSW's service worker file (copied from public/ for
+ * the dev server) is removed from dist/ after every build. `npm run check:prod-bundle` checks it.
  */
-function mocksOnlyWhenAsked(mocks: boolean): Plugin {
+function dropMockWorker(): Plugin {
   let outDir = 'dist';
   return {
-    name: 'thirdwheel-mocks-only-when-asked',
+    name: 'thirdwheel-drop-mock-worker',
     apply: 'build',
     configResolved(c) {
       outDir = path.resolve(c.root, c.build.outDir);
-      if (mocks)
-        c.logger.warn('\n  VITE_API_MOCKS=1: this is a DEMO build that answers from mock data, not the real API.\n');
     },
     closeBundle() {
-      if (!mocks) fs.rmSync(path.join(outDir, 'mockServiceWorker.js'), { force: true });
+      fs.rmSync(path.join(outDir, 'mockServiceWorker.js'), { force: true });
     },
   };
 }
 
 // The dev server proxies /api to the Thirdwheel API so the panel and the API share an origin
 // in development (no CORS setup needed). Production builds call VITE_API_URL directly.
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const target = env.VITE_API_PROXY_TARGET || 'http://localhost:3000';
-  const mocks = env.VITE_API_MOCKS === '1';
+
+  // A production build must talk to a real API over https and can never run with mocks
+  // (STAFF_API.md §9). Fail before building anything.
+  if (command === 'build' && mode === 'production') {
+    const problems = checkProductionEnv(env);
+    if (problems.length) throw new Error(`Refusing to build the panel for production:\n  - ${problems.join('\n  - ')}`);
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf8')) as { version: string };
 
   return {
-    plugins: [react(), tailwindcss(), mocksOnlyWhenAsked(mocks)],
+    // Shown in the sidebar footer; one source of truth (package.json).
+    define: { __PANEL_VERSION__: JSON.stringify(pkg.version) },
+    plugins: [react(), tailwindcss(), dropMockWorker()],
     resolve: {
       alias: { '@': path.resolve(import.meta.dirname, 'src') },
     },

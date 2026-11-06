@@ -6,9 +6,8 @@ import {
   columnHelper,
   ConfirmDialog,
   DataTable,
-  ForbiddenState,
   PageHeader,
-  RoleGate,
+  RequirePermission,
   type FacetedFilterConfig,
 } from '@/components/shared';
 import { Button } from '@/components/ui/button';
@@ -25,9 +24,9 @@ const route = getRouteApi('/_app/catalog');
 
 export function CatalogPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="the legacy catalog" />}>
+    <RequirePermission perm="catalog.manage" what="the legacy catalog">
       <Catalog />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 

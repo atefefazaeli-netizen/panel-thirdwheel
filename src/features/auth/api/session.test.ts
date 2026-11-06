@@ -1,77 +1,83 @@
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { setTokens } from '@/lib/api/tokens';
+import { describe, expect, it } from 'vitest';
+import { getCsrfToken } from '@/lib/api/csrf';
+import { db } from '@/mocks/db';
 import { server } from '@/mocks/node';
 import { p } from '@/mocks/utils';
 import { useSession } from '@/stores/session';
-import { __resetRecheckForTests, ensureSession, recheckRoles } from './session';
+import { signInAs } from '@/test/utils';
+import { ensureSession, recheckPermissions } from './session';
 
-const staff = { userId: 'u1', email: 'lead@thirdwheel.app', roles: ['user', 'admin'] };
-
-/** A reload: no access token in memory, only the refresh token. */
-function reloadWithRefreshToken() {
-  setTokens({ token: 'old', refreshToken: 'rt_1', expiresIn: -1 });
-  useSession.setState({ status: 'unknown', user: null });
+/** A reload: the store and the CSRF token are gone, only the (HttpOnly) cookie is left. */
+function reload() {
+  useSession.setState({ status: 'unknown', staff: null, restricted: null });
 }
 
 describe('ensureSession (page reload)', () => {
-  beforeEach(reloadWithRefreshToken);
+  it('restores the session from GET staff/auth/session and keeps the CSRF token in memory', async () => {
+    const me = signInAs(['content_editor']);
+    reload();
+    await ensureSession();
+    expect(useSession.getState()).toMatchObject({
+      status: 'signedIn',
+      staff: { id: me.id, roles: ['content_editor'] },
+    });
+    expect(getCsrfToken()).toBeTruthy();
+  });
 
-  it('rides out a rate-limited refresh and signs in on the retry', async () => {
+  it('rides out a rate-limited session check and signs in on the retry', async () => {
+    signInAs(['owner']);
+    reload();
     let calls = 0;
     server.use(
-      http.post(p('auth/refresh'), () => {
+      http.get(p('staff/auth/session'), () => {
         calls += 1;
-        return calls === 1
-          ? HttpResponse.json({ statusCode: 429, message: 'Too Many Requests' }, { status: 429 })
-          : HttpResponse.json({ token: 'fresh', refreshToken: 'rt_2', expiresIn: 900 });
+        if (calls === 1) return HttpResponse.json({ statusCode: 429, message: 'Too Many Requests' }, { status: 429 });
+        return undefined; // fall through to the mock API
       }),
-      http.get(p('admin/me'), () => HttpResponse.json(staff)),
     );
     await ensureSession();
     expect(calls).toBe(2);
-    expect(useSession.getState()).toMatchObject({ status: 'signedIn', user: staff });
+    expect(useSession.getState().status).toBe('signedIn');
   });
 
-  it('asks for a fresh sign-in when the refresh token is refused', async () => {
-    server.use(
-      http.post(p('auth/refresh'), () =>
-        HttpResponse.json({ statusCode: 401, message: 'Unauthorized' }, { status: 401 }),
-      ),
-    );
+  it('asks for a sign-in when there is no session (401 STAFF_SESSION_REQUIRED)', async () => {
+    reload();
     await ensureSession();
     expect(useSession.getState().status).toBe('signedOut');
   });
+
+  it('a restricted session reloads as restricted (it must finish its step)', async () => {
+    signInAs(['support_agent'], 'temp.reload');
+    const sid = db().staff.jar!;
+    db().staff.sessions.get(sid)!.restricted = 'password_change';
+    reload();
+    await ensureSession();
+    expect(useSession.getState()).toMatchObject({ status: 'restricted', restricted: 'password_change' });
+  });
 });
 
-describe('recheckRoles (roles changed on the server)', () => {
-  beforeEach(() => {
-    __resetRecheckForTests();
-    setTokens({ token: 'live', refreshToken: 'rt_live', expiresIn: 900 });
-    useSession.getState().signIn({ ...staff, roles: ['user', 'admin', 'clinician'] });
-  });
-
-  it('re-reads admin/me so the role gates follow a removed role', async () => {
+describe('recheckPermissions (roles changed on the server)', () => {
+  it('re-reads the session so gates follow a removed permission, at most every 5 seconds', async () => {
+    signInAs(['user_moderator'], 'mod.recheck');
+    const account = db().staff.accounts.find((a) => a.username === 'mod.recheck')!;
+    account.roles = ['analyst'];
     let calls = 0;
-    server.use(http.get(p('admin/me'), () => (calls++, HttpResponse.json({ ...staff, roles: ['user', 'clinician'] }))));
-    await expect(recheckRoles(1_000_000)).resolves.toBe('signedIn');
-    expect(useSession.getState().user?.roles).toEqual(['user', 'clinician']);
-    // At most once every 5 seconds.
-    await expect(recheckRoles(1_002_000)).resolves.toBe('unchanged');
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/staff/auth/session')) calls += 1;
+    });
+    await expect(recheckPermissions(1_000_000)).resolves.toBe('signedIn');
+    expect(useSession.getState().staff?.permissions).toContain('config.read');
+    expect(useSession.getState().staff?.permissions).not.toContain('users.read');
+    await expect(recheckPermissions(1_002_000)).resolves.toBe('unchanged');
+    server.events.removeAllListeners();
     expect(calls).toBe(1);
   });
 
-  it('moves to no access when no staff role is left', async () => {
-    server.use(
-      http.get(p('admin/me'), () =>
-        HttpResponse.json(
-          { statusCode: 403, message: 'Insufficient role', code: 'INSUFFICIENT_ROLE' },
-          { status: 403 },
-        ),
-      ),
-      http.post(p('auth/logout'), () => new HttpResponse(null, { status: 204 })),
-    );
-    await expect(recheckRoles(2_000_000)).resolves.toBe('noAccess');
-    expect(useSession.getState().status).toBe('noAccess');
+  it('moves to signed out when the session was revoked', async () => {
+    signInAs(['owner']);
+    db().staff.sessions.clear();
+    await expect(recheckPermissions(2_000_000)).resolves.toBe('signedOut');
+    expect(useSession.getState()).toMatchObject({ status: 'signedOut', endedReason: 'expired' });
   });
 });

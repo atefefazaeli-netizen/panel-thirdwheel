@@ -4,7 +4,7 @@ import { CheckCircle2Icon, LockIcon, SirenIcon } from 'lucide-react';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { FormDialog, FormFieldTextarea, RoleGate, StatusBadge } from '@/components/shared';
+import { FormDialog, FormFieldTextarea, Can, StatusBadge } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -51,11 +51,11 @@ export function FlagDetail({ flag }: { flag: SafetyFlag }) {
     [
       'Person',
       <span key="p" className="flex flex-col">
-        <RoleGate allow="admin" fallback={<span className="font-medium">{flag.userEmail ?? flag.userId}</span>}>
+        <Can perm="users.read" fallback={<span className="font-medium">{flag.userEmail ?? flag.userId}</span>}>
           <Link to="/users/$id" params={{ id: flag.userId }} className="font-medium hover:underline">
             {flag.userEmail ?? flag.userId}
           </Link>
-        </RoleGate>
+        </Can>
         <span className="font-mono text-xs text-muted-foreground">{flag.userId}</span>
       </span>,
     ],
@@ -86,16 +86,18 @@ export function FlagDetail({ flag }: { flag: SafetyFlag }) {
           </div>
         ))}
       </dl>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={() => setDialog('review')} disabled={flag.status === 'reviewed'}>
-          <CheckCircle2Icon />
-          Mark reviewed
-        </Button>
-        <Button size="sm" variant="destructive" onClick={() => setDialog('escalate')}>
-          <SirenIcon />
-          Escalate
-        </Button>
-      </div>
+      <Can perm="safety.handle">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setDialog('review')} disabled={flag.status === 'reviewed'}>
+            <CheckCircle2Icon />
+            Mark reviewed
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setDialog('escalate')}>
+            <SirenIcon />
+            Escalate
+          </Button>
+        </div>
+      </Can>
       {flag.escalations.length > 0 && (
         <>
           <Separator />
@@ -124,14 +126,16 @@ export function FlagDetail({ flag }: { flag: SafetyFlag }) {
             {flag.notes.map((n) => (
               <li key={n.id} className="rounded-md bg-muted/50 p-3 text-sm">
                 <p className="mb-1 text-xs text-muted-foreground">
-                  {n.byEmail ?? n.by} · <time dateTime={n.at}>{formatRelative(n.at)}</time>
+                  {n.byName ?? n.byEmail ?? n.by} · <time dateTime={n.at}>{formatRelative(n.at)}</time>
                 </p>
                 <p className="whitespace-pre-wrap">{n.text}</p>
               </li>
             ))}
           </ol>
         )}
-        <NoteForm flagId={flag.id} />
+        <Can perm="safety.handle">
+          <NoteForm flagId={flag.id} />
+        </Can>
       </div>
 
       <FormDialog

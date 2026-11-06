@@ -85,11 +85,11 @@ function validEvents(events: unknown): events is WebhookEvent[] {
 
 export const integrationsHandlers = [
   http.get(p('admin/integrations/webhooks'), ({ request }) =>
-    guard(request, 'admin', () => HttpResponse.json(db().integrations.webhooks)),
+    guard(request, 'integrations.read', () => HttpResponse.json(db().integrations.webhooks)),
   ),
 
   http.post(p('admin/integrations/webhooks'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'integrations.manage', async (me) => {
       const b = await readJson<{ name?: string; url?: string; events?: unknown; enabled?: boolean }>(request);
       if (typeof b.name !== 'string' || !b.name.trim() || b.name.length > 80)
         return badRequest('name must be 1 to 80 characters');
@@ -118,7 +118,7 @@ export const integrationsHandlers = [
   ),
 
   http.patch(p('admin/integrations/webhooks/:id'), ({ request, params }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'integrations.manage', async (me) => {
       const w = hook(params.id);
       if (!w) return hookMissing();
       const b = await readJson<{ name?: string; url?: string; events?: unknown; enabled?: boolean }>(request);
@@ -141,7 +141,7 @@ export const integrationsHandlers = [
   ),
 
   http.delete(p('admin/integrations/webhooks/:id'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'integrations.manage', (me) => {
       const s = db().integrations;
       const w = hook(params.id);
       if (!w) return hookMissing();
@@ -155,7 +155,7 @@ export const integrationsHandlers = [
   ),
 
   http.post(p('admin/integrations/webhooks/:id/rotate-secret'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'integrations.manage', (me) => {
       const w = hook(params.id);
       if (!w) return hookMissing();
       const secret = newSecret();
@@ -167,7 +167,7 @@ export const integrationsHandlers = [
   ),
 
   http.post(p('admin/integrations/webhooks/:id/test'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'integrations.manage', (me) => {
       const w = hook(params.id);
       if (!w) return hookMissing();
       // Sent even when the webhook is disabled or not subscribed.
@@ -178,7 +178,7 @@ export const integrationsHandlers = [
   ),
 
   http.get(p('admin/integrations/deliveries'), ({ request }) =>
-    guard(request, 'admin', () => {
+    guard(request, 'integrations.read', () => {
       const url = new URL(request.url);
       const q = url.searchParams;
       const rows = db()
@@ -194,7 +194,7 @@ export const integrationsHandlers = [
   ),
 
   http.post(p('admin/integrations/deliveries/:id/retry'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'integrations.manage', (me) => {
       const d = db().integrations.deliveries.find((x) => x.id === String(params.id));
       if (!d) return apiError(404, 'Delivery not found', 'DELIVERY_NOT_FOUND');
       // A fresh run of 6 attempts with the same delivery id.
@@ -213,11 +213,11 @@ export const integrationsHandlers = [
   ),
 
   http.get(p('admin/integrations/api-keys'), ({ request }) =>
-    guard(request, 'admin', () => HttpResponse.json(db().integrations.apiKeys)),
+    guard(request, 'integrations.read', () => HttpResponse.json(db().integrations.apiKeys)),
   ),
 
   http.post(p('admin/integrations/api-keys'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'integrations.manage', async (me) => {
       const b = await readJson<{ name?: string; scopes?: unknown }>(request);
       if (typeof b.name !== 'string' || !b.name.trim() || b.name.length > 80)
         return badRequest('name must be 1 to 80 characters');
@@ -244,7 +244,7 @@ export const integrationsHandlers = [
   ),
 
   http.delete(p('admin/integrations/api-keys/:id'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'integrations.manage', (me) => {
       const k = db().integrations.apiKeys.find((x) => x.id === String(params.id));
       if (!k) return apiError(404, 'API key not found', 'API_KEY_NOT_FOUND');
       k.revokedAt ??= nowIso();

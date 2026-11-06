@@ -4,9 +4,11 @@ import { render, type RenderOptions } from '@testing-library/react';
 import type * as React from 'react';
 import { createAppRouter } from '@/app/router';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { setTokens } from '@/lib/api/tokens';
+import { setCsrfToken } from '@/lib/api/csrf';
+import { staffId, staffMe, type StaffAccount } from '@/mocks/data/staff';
 import { db } from '@/mocks/db';
-import { useSession, type StaffUser } from '@/stores/session';
+import { openSessionFor } from '@/mocks/handlers/auth';
+import { useSession, type StaffMe } from '@/stores/session';
 
 export function testQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
@@ -23,21 +25,46 @@ export function renderWithProviders(ui: React.ReactElement, opts: RenderOptions 
   return { ...result, queryClient };
 }
 
-/** Signs a staff member in for a test: session store + a valid mock access token. */
-export function signInAs(roles: string[] = ['admin', 'clinician'], email = 'lead@thirdwheel.app'): StaffUser {
-  const user: StaffUser = { userId: 'stf_test', email, roles };
-  const token = `mock_at_test_${roles.join('_') || 'none'}`;
-  db().auth.access.set(token, { user, exp: Date.now() + 15 * 60_000 });
-  db().auth.refresh.set('mock_rt_test_refresh_token_0000000000', user);
-  setTokens({ token, refreshToken: 'mock_rt_test_refresh_token_0000000000', expiresIn: 900 });
-  useSession.getState().signIn(user);
-  return user;
+/**
+ * Signs a staff member in for a test: a mock staff account with these roles (built-in or custom
+ * role keys), a live mock session (the "cookie"), the CSRF token in the client's memory, and the
+ * session store. Permissions are computed from the roles exactly as the mock server does.
+ */
+export function signInAs(roles: string[] = ['owner'], username = `test.${roles.join('.') || 'none'}`): StaffMe {
+  const s = db().staff;
+  let account = s.accounts.find((a) => a.username === username);
+  if (!account) {
+    account = {
+      id: staffId(username),
+      username,
+      displayName: `Test ${roles.join(' + ') || 'nobody'}`,
+      roles,
+      password: 'test-password-long',
+      disabled: false,
+      mfaSecret: null,
+      pendingSecret: null,
+      recoveryCodes: [],
+      lastStep: -1,
+      mustChangePassword: false,
+      failures: 0,
+      lockouts: 0,
+      lockedUntil: null,
+      lastLoginAt: null,
+      createdAt: new Date().toISOString(),
+    } satisfies StaffAccount;
+    s.accounts.push(account);
+  }
+  const { session } = openSessionFor(account);
+  setCsrfToken(session.csrfToken);
+  const me = staffMe(account, s.customRoles) as StaffMe;
+  useSession.getState().setSession(me);
+  return me;
 }
 
-/** Renders the full app router at a path (signed in unless roles is null). */
-export function renderRoute(path: string, opts: { roles?: string[] | null } = {}) {
-  if (opts.roles !== null) signInAs(opts.roles ?? ['admin', 'clinician']);
-  else useSession.setState({ status: 'unknown', user: null });
+/** Renders the full app router at a path (signed in with these roles unless roles is null). */
+export function renderRoute(path: string, opts: { roles?: string[] | null; username?: string } = {}) {
+  if (opts.roles !== null) signInAs(opts.roles ?? ['owner'], opts.username);
+  else useSession.setState({ status: 'unknown', staff: null, restricted: null });
   const queryClient = testQueryClient();
   const router = createAppRouter(queryClient, { history: createMemoryHistory({ initialEntries: [path] }) });
   const result = render(

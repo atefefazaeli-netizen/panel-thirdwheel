@@ -18,12 +18,23 @@ import {
   type Transition,
 } from '../content-domain';
 import { daysAgo } from '../utils';
-import { uid } from './users';
+import { staffId } from './staff';
 import seed from './content-seed.json';
 
-export const LEAD: Actor = { id: uid('lead'), email: 'lead@thirdwheel.app', roles: ['admin'] };
-export const DOCTOR: Actor = { id: uid('doctor'), email: 'dr.noor@thirdwheel.app', roles: ['clinician'] };
-const N8N: Actor = { id: 'apikey:n8n-sheets', email: null, roles: [] };
+/** The seed's editor and clinician (staff accounts `editor` and `reviewer`, data/staff.ts). */
+export const LEAD: Actor = {
+  id: `staff:${staffId('editor')}`,
+  email: null,
+  name: 'Huda Karim',
+  permissions: ['content.read', 'content.edit', 'content.submit'],
+};
+export const DOCTOR: Actor = {
+  id: `staff:${staffId('reviewer')}`,
+  email: null,
+  name: 'Dr. Noor Rahman',
+  permissions: ['content.read', 'content.approve', 'content.unpublish'],
+};
+const N8N: Actor = { id: 'apikey:n8n-sheets', email: null, permissions: [] };
 
 type SeedItem = {
   id: string;

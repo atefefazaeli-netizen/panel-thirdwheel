@@ -1,11 +1,11 @@
-// ADMIN_API.md › Users & couples (admin only).
+// ADMIN_API.md › Users & couples, with the permissions of STAFF_API.md §4 (users.*).
 import { http, HttpResponse } from 'msw';
 import type { AdminSubscriptionView, AdminUserDetail, AdminUserRow, PlusSource } from '@/features/users/api/types';
-import type { StaffUser } from '@/stores/session';
+import type { Permission } from '@/lib/permissions';
 import type { MockUser } from '../data/users';
 import { db, recordAudit } from '../db';
 import { emitMockEvent } from '../events';
-import { guard } from '../session';
+import { guard, holds, type MockActor } from '../session';
 import { apiError, badRequest, nowIso, p, paginate, readJson } from '../utils';
 
 const TAG_RE = /^[a-z0-9-]{1,32}$/;
@@ -72,8 +72,10 @@ export function subscriptionView(u: MockUser): AdminSubscriptionView {
   return { ...s, source, verification: storeBacked ? 'mock' : null };
 }
 
-const detail = (u: MockUser): AdminUserDetail => {
+/** The detail's `safety` part needs safety.read and its `support` part support.read (§4). */
+const detail = (u: MockUser, me: MockActor): AdminUserDetail => {
   const partner = u.couple ? db().users.get(u.couple.partnerId) : null;
+  const s = summaries(u.account.userId);
   return {
     account: u.account,
     profile: u.profile,
@@ -86,32 +88,29 @@ const detail = (u: MockUser): AdminUserDetail => {
           }
         : null,
     subscription: subscriptionView(u),
-    ...summaries(u.account.userId),
+    safety: holds(me, 'safety.read') ? s.safety : null,
+    support: holds(me, 'support.read') ? s.support : null,
     unavailable: [],
   };
 };
 
-/** Runs an admin action on one account: 404 when missing, 409 SELF_ACTION when `self` is not allowed. */
+/** Runs a staff action on one account: 404 when missing. Staff are not app users (no SELF_ACTION). */
 function onUser(
   request: Request,
   id: unknown,
-  opts: { noSelf?: boolean },
-  fn: (u: MockUser, me: StaffUser) => Response | Promise<Response>,
+  perm: Permission,
+  fn: (u: MockUser, me: MockActor) => Response | Promise<Response>,
 ) {
-  return guard(request, 'admin', (me) => {
+  return guard(request, perm, (me) => {
     const u = db().users.get(String(id));
     if (!u) return apiError(404, 'User not found', 'USER_NOT_FOUND');
-    if (opts.noSelf && u.account.userId === me.userId)
-      return apiError(409, 'You cannot do this to your own account.', 'SELF_ACTION');
     return fn(u, me);
   });
 }
 
 function revokeSessions(u: MockUser) {
+  // The app user's refresh tokens (not modelled here) stop working: the token version moves on.
   u.tokenVersion += 1;
-  const auth = db().auth;
-  for (const [t, v] of auth.access) if (v.user.userId === u.account.userId) auth.access.delete(t);
-  for (const [t, v] of auth.refresh) if (v.userId === u.account.userId) auth.refresh.delete(t);
 }
 
 /** "One plan covers both partners": a Plus grant or store plan carries to the partner. */
@@ -172,7 +171,7 @@ function unlinkCouple(u: MockUser): boolean {
 
 export const usersHandlers = [
   http.get(p('admin/users'), ({ request }) =>
-    guard(request, 'admin', () => {
+    guard(request, 'users.read', () => {
       const url = new URL(request.url);
       const q = url.searchParams;
       const term = (q.get('q') ?? '').trim().toLowerCase();
@@ -201,11 +200,11 @@ export const usersHandlers = [
   ),
 
   http.get(p('admin/users/:id'), ({ request, params }) =>
-    onUser(request, params.id, {}, (u) => HttpResponse.json(detail(u))),
+    onUser(request, params.id, 'users.read', (u, me) => HttpResponse.json(detail(u, me))),
   ),
 
   http.post(p('admin/users/:id/sign-out'), ({ request, params }) =>
-    onUser(request, params.id, {}, (u, me) => {
+    onUser(request, params.id, 'users.signout', (u, me) => {
       revokeSessions(u);
       recordAudit(me, 'user.sign_out', `user:${u.account.userId}`);
       return HttpResponse.json({ ok: true });
@@ -213,7 +212,7 @@ export const usersHandlers = [
   ),
 
   http.post(p('admin/users/:id/suspend'), ({ request, params }) =>
-    onUser(request, params.id, { noSelf: true }, async (u, me) => {
+    onUser(request, params.id, 'users.suspend', async (u, me) => {
       const { reason } = await readJson<{ reason?: string }>(request);
       if (typeof reason !== 'string' || !reason.trim() || reason.length > 300)
         return badRequest('reason must be 1 to 300 characters');
@@ -225,7 +224,7 @@ export const usersHandlers = [
   ),
 
   http.post(p('admin/users/:id/unsuspend'), ({ request, params }) =>
-    onUser(request, params.id, {}, (u, me) => {
+    onUser(request, params.id, 'users.suspend', (u, me) => {
       u.account = { ...u.account, suspended: false, suspendedReason: null };
       recordAudit(me, 'user.unsuspend', `user:${u.account.userId}`);
       return HttpResponse.json(u.account);
@@ -233,7 +232,7 @@ export const usersHandlers = [
   ),
 
   http.put(p('admin/users/:id/tags'), ({ request, params }) =>
-    onUser(request, params.id, {}, async (u, me) => {
+    onUser(request, params.id, 'users.tags', async (u, me) => {
       const { tags } = await readJson<{ tags?: unknown }>(request);
       if (!Array.isArray(tags) || tags.length > 20 || tags.some((t) => typeof t !== 'string' || !TAG_RE.test(t))) {
         return badRequest('tags: at most 20, each 1 to 32 of a-z, 0-9 and -');
@@ -245,7 +244,7 @@ export const usersHandlers = [
   ),
 
   http.post(p('admin/users/:id/plus'), ({ request, params }) =>
-    onUser(request, params.id, {}, async (u, me) => {
+    onUser(request, params.id, 'users.plus', async (u, me) => {
       const { days, note } = await readJson<{ days?: unknown; note?: unknown }>(request);
       if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 365)
         return badRequest('days must be a whole number from 1 to 365');
@@ -270,7 +269,7 @@ export const usersHandlers = [
   ),
 
   http.delete(p('admin/users/:id/plus'), ({ request, params }) =>
-    onUser(request, params.id, {}, (u, me) => {
+    onUser(request, params.id, 'users.plus', (u, me) => {
       u.subscription = { ...u.subscription, grant: null };
       syncPlus(u);
       recordAudit(me, 'user.plus_revoke', `user:${u.account.userId}`);
@@ -279,7 +278,7 @@ export const usersHandlers = [
   ),
 
   http.post(p('admin/users/:id/unlink'), ({ request, params }) =>
-    onUser(request, params.id, {}, (u, me) => {
+    onUser(request, params.id, 'users.unlink', (u, me) => {
       const unlinked = unlinkCouple(u);
       recordAudit(me, 'user.unlink', `user:${u.account.userId}`, { unlinked });
       return HttpResponse.json({ unlinked });
@@ -287,10 +286,8 @@ export const usersHandlers = [
   ),
 
   http.delete(p('admin/users/:id'), ({ request, params }) =>
-    onUser(request, params.id, { noSelf: true }, async (u, me) => {
+    onUser(request, params.id, 'users.delete', async (u, me) => {
       const { confirmEmail } = await readJson<{ confirmEmail?: string }>(request);
-      if (u.account.roles.includes('admin') || u.account.roles.includes('clinician'))
-        return apiError(409, 'Staff accounts cannot be deleted here.', 'STAFF_ACCOUNT');
       if (!confirmEmail || confirmEmail.trim().toLowerCase() !== (u.account.email ?? '').toLowerCase())
         return apiError(400, 'The email does not match this account.', 'CONFIRM_MISMATCH');
       unlinkCouple(u);

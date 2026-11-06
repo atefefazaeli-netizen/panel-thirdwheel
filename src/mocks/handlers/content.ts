@@ -8,7 +8,7 @@ import type {
   ContentSummary,
   ContentVersion,
 } from '@/features/content/api/types';
-import type { StaffUser } from '@/stores/session';
+import type { Permission } from '@/lib/permissions';
 import {
   approveDraft,
   checkRev,
@@ -32,10 +32,15 @@ import {
 } from '../content-domain';
 import { db, recordAudit } from '../db';
 import { emitMockEvent } from '../events';
-import { guard } from '../session';
+import { guard, type MockActor } from '../session';
 import { apiError, badRequest, nowIso, p, paginate, readJson } from '../utils';
 
-const actorOf = (me: StaffUser): Actor => ({ id: me.userId, email: me.email, roles: me.roles });
+const actorOf = (me: MockActor): Actor => ({
+  id: me.userId,
+  email: me.email,
+  name: me.name,
+  permissions: me.permissions,
+});
 const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
 
 function summary(i: StoredItem): ContentSummary {
@@ -85,7 +90,7 @@ function find(id: string | readonly string[] | undefined) {
 }
 
 /** Applies a transition: store it, log it, publish when live changed, audit the write. */
-function commit(me: StaffUser, action: string, t: Transition, meta: Record<string, unknown> = {}, bump = true) {
+function commit(me: MockActor, action: string, t: Transition, meta: Record<string, unknown> = {}, bump = true) {
   const c = db().content;
   let item = t.item;
   if (t.publishes) {
@@ -115,9 +120,9 @@ function commit(me: StaffUser, action: string, t: Transition, meta: Record<strin
 
 function step(
   request: Request,
-  need: 'admin' | 'clinician',
+  need: Permission,
   action: string,
-  fn: (item: StoredItem, me: StaffUser, body: Record<string, unknown>) => Transition,
+  fn: (item: StoredItem, me: MockActor, body: Record<string, unknown>) => Transition,
   id: string,
 ) {
   return guard(request, need, async (me) => {
@@ -145,7 +150,7 @@ const note = (b: Record<string, unknown>) => (typeof b.note === 'string' ? b.not
 
 export const contentHandlers = [
   http.get(p('admin/content'), ({ request }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'content.read', () => {
       const url = new URL(request.url);
       const q = url.searchParams;
       const term = (q.get('q') ?? '').trim().toLowerCase().slice(0, 80);
@@ -182,7 +187,7 @@ export const contentHandlers = [
   ),
 
   http.get(p('admin/content/facets'), ({ request }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'content.read', () => {
       const rows = [...db().content.items.values()].map(summary);
       const set = (k: 'category' | 'type' | 'kind') =>
         [...new Set(rows.map((r) => r[k]).filter((x): x is string => !!x))].sort();
@@ -191,7 +196,7 @@ export const contentHandlers = [
   ),
 
   http.post(p('admin/content/import'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'content.edit', async (me) => {
       const body = await readJson<{ items?: unknown; note?: string; dryRun?: boolean }>(request);
       if (!Array.isArray(body.items)) return badRequest('items must be an array');
       if (body.items.length > 200) return apiError(400, 'At most 200 items in one import.', 'INVALID_CONTENT');
@@ -257,14 +262,14 @@ export const contentHandlers = [
   ),
 
   http.get(p('admin/content/:id'), ({ request, params }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'content.read', () => {
       const item = find(params.id);
       return item ? HttpResponse.json(view(item)) : apiError(404, 'Content not found', 'CONTENT_NOT_FOUND');
     }),
   ),
 
   http.post(p('admin/content'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'content.edit', async (me) => {
       const body = await readJson<{
         id?: string;
         code?: string | null;
@@ -296,7 +301,7 @@ export const contentHandlers = [
   http.put(p('admin/content/:id/draft'), ({ request, params }) =>
     step(
       request,
-      'admin',
+      'content.edit',
       'content.draft.save',
       (i, me, b) => saveDraft(i, b.snapshot, actorOf(me), nowIso()),
       String(params.id),
@@ -305,7 +310,7 @@ export const contentHandlers = [
   http.delete(p('admin/content/:id/draft'), ({ request, params }) =>
     step(
       request,
-      'admin',
+      'content.edit',
       'content.draft.discard',
       (i, me) => discardDraft(i, actorOf(me), nowIso()),
       String(params.id),
@@ -314,7 +319,7 @@ export const contentHandlers = [
   http.post(p('admin/content/:id/submit'), ({ request, params }) =>
     step(
       request,
-      'admin',
+      'content.submit',
       'content.submit',
       (i, me, b) => submitDraft(i, note(b), actorOf(me), nowIso()),
       String(params.id),
@@ -323,7 +328,7 @@ export const contentHandlers = [
   http.post(p('admin/content/:id/approve'), ({ request, params }) =>
     step(
       request,
-      'clinician',
+      'content.approve',
       'content.approve',
       (i, me, b) => approveDraft(i, note(b), actorOf(me), nowIso(), b.acknowledgeHeld === true),
       String(params.id),
@@ -332,21 +337,33 @@ export const contentHandlers = [
   http.post(p('admin/content/:id/request-changes'), ({ request, params }) =>
     step(
       request,
-      'clinician',
+      'content.approve',
       'content.request_changes',
       (i, me, b) => requestChanges(i, note(b), actorOf(me), nowIso()),
       String(params.id),
     ),
   ),
   http.post(p('admin/content/:id/unpublish'), ({ request, params }) =>
-    step(request, 'admin', 'content.unpublish', (i, me) => unpublishItem(i, actorOf(me), nowIso()), String(params.id)),
+    step(
+      request,
+      'content.unpublish',
+      'content.unpublish',
+      (i, me) => unpublishItem(i, actorOf(me), nowIso()),
+      String(params.id),
+    ),
   ),
   http.post(p('admin/content/:id/restore'), ({ request, params }) =>
-    step(request, 'admin', 'content.restore', (i, me) => restoreItem(i, actorOf(me), nowIso()), String(params.id)),
+    step(
+      request,
+      'content.unpublish',
+      'content.restore',
+      (i, me) => restoreItem(i, actorOf(me), nowIso()),
+      String(params.id),
+    ),
   ),
 
   http.get(p('admin/content/:id/versions'), ({ request, params }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'content.read', () => {
       if (!find(params.id)) return apiError(404, 'Content not found', 'CONTENT_NOT_FOUND');
       const rows = db()
         .content.versions.filter((v) => v.itemId === params.id)
@@ -357,7 +374,7 @@ export const contentHandlers = [
   ),
 
   http.get(p('admin/content/:id/versions/:version'), ({ request, params }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'content.read', () => {
       const v = db().content.versions.find((x) => x.itemId === params.id && x.version === Number(params.version));
       if (!v) return apiError(404, 'No such version.', 'VERSION_NOT_FOUND');
       return HttpResponse.json({ ...versionView(v), snapshot: v.snapshot });
@@ -367,7 +384,7 @@ export const contentHandlers = [
   http.post(p('admin/content/:id/rollback'), ({ request, params }) =>
     step(
       request,
-      'admin',
+      'content.unpublish',
       'content.rollback',
       (i, me, b) => {
         const target = db().content.versions.find((x) => x.itemId === i.id && x.version === Number(b.version));
@@ -379,7 +396,7 @@ export const contentHandlers = [
   ),
 
   http.get(p('admin/content/:id/changes'), ({ request, params }) =>
-    guard(request, 'staff', () => {
+    guard(request, 'content.read', () => {
       if (!find(params.id)) return apiError(404, 'Content not found', 'CONTENT_NOT_FOUND');
       const rows = db()
         .content.changes.filter((c) => c.itemId === params.id)
@@ -391,10 +408,10 @@ export const contentHandlers = [
 
   // App routes (the panel does not call them; here so the mock covers the whole contract).
   http.get(p('content/manifest'), ({ request }) =>
-    guard(request, 'user', () => HttpResponse.json({ revision: db().content.revision, updatedAt: nowIso() })),
+    guard(request, 'session', () => HttpResponse.json({ revision: db().content.revision, updatedAt: nowIso() })),
   ),
   http.get(p('content/published'), ({ request }) =>
-    guard(request, 'user', () => {
+    guard(request, 'session', () => {
       const since = Number(new URL(request.url).searchParams.get('since') ?? 0);
       const changed = [...db().content.items.values()].filter((i) => i.liveRevision > since);
       const items = changed

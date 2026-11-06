@@ -7,7 +7,7 @@ import { renderRoute } from '@/test/utils';
 describe('integrations (mock API)', () => {
   it('creates a webhook and shows its secret once', async () => {
     const user = userEvent.setup();
-    renderRoute('/settings/integrations', { roles: ['admin'] });
+    renderRoute('/settings/integrations', { roles: ['owner'] });
     await user.click(await screen.findByRole('button', { name: 'New webhook' }));
     const dialog = await screen.findByRole('dialog', { name: 'New webhook' });
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Plan changes to CRM');
@@ -30,12 +30,12 @@ describe('integrations (mock API)', () => {
     expect(screen.queryByDisplayValue(/^whsec_/)).toBeNull();
   });
 
-  it('a clinician approval sends content.published to subscribed, enabled webhooks', async () => {
+  it('a content reviewer approval sends content.published to subscribed, enabled webhooks', async () => {
     const content = db().integrations.webhooks.find((w) => w.events.includes('content.published'))!;
     content.enabled = true;
     const before = db().integrations.deliveries.length;
     const user = userEvent.setup();
-    renderRoute('/review?id=my-perfect-day', { roles: ['clinician'] });
+    renderRoute('/review?id=my-perfect-day', { roles: ['content_reviewer'] });
     await user.click(await screen.findByRole('button', { name: 'Approve and publish' }));
     const dialog = await screen.findByRole('dialog', { name: 'Approve and publish' });
     await user.click(within(dialog).getByRole('button', { name: 'Approve and publish' }));
@@ -49,7 +49,7 @@ describe('integrations (mock API)', () => {
 
   it('filters failed deliveries, opens the payload and retries', async () => {
     const user = userEvent.setup();
-    renderRoute('/settings/integrations?tab=deliveries&status=failed', { roles: ['admin'] });
+    renderRoute('/settings/integrations?tab=deliveries&status=failed', { roles: ['owner'] });
     const table = await screen.findByRole('table', { name: 'Webhook deliveries' });
     await waitFor(() =>
       expect(within(table).getAllByRole('row').length).toBe(
@@ -67,7 +67,7 @@ describe('integrations (mock API)', () => {
 
   it('creates an API key with scopes, shows it once and revokes one', async () => {
     const user = userEvent.setup();
-    renderRoute('/settings/integrations?tab=api-keys', { roles: ['admin'] });
+    renderRoute('/settings/integrations?tab=api-keys', { roles: ['owner'] });
     await user.click(await screen.findByRole('button', { name: 'New API key' }));
     const dialog = await screen.findByRole('dialog', { name: 'New API key' });
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'n8n moderation v2');
@@ -88,14 +88,14 @@ describe('integrations (mock API)', () => {
   });
 
   it('shows the signature check with the headers', async () => {
-    renderRoute('/settings/integrations?tab=verify', { roles: ['admin'] });
+    renderRoute('/settings/integrations?tab=verify', { roles: ['owner'] });
     expect(await screen.findByText('How to verify signatures')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Webhook headers' })).toHaveTextContent('X-Thirdwheel-Signature');
     expect(screen.getByLabelText('n8n snippet')).toHaveTextContent("createHmac('sha256', SECRET)");
   });
 
-  it('clinicians cannot open integrations', async () => {
-    renderRoute('/settings/integrations', { roles: ['clinician'] });
+  it('needs integrations.read', async () => {
+    renderRoute('/settings/integrations', { roles: ['content_reviewer'] });
     expect(await screen.findByText('Not available for your role')).toBeInTheDocument();
   });
 });
