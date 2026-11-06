@@ -1,14 +1,16 @@
-// Remote Config (STAFF_API.md §6, as built on feature/support-remote-config). Only public fields:
-// the app reads them from `GET app-config`.
+// Remote Config (STAFF_API.md §6, reconciled with v2.0.0): a draft staff edit, published as
+// numbered versions. Field names and the 8 feature keys are the app's (`GET app-config`, which
+// the released app reads); the list of switches, their labels and descriptions come from the server.
 
 export interface AppConfigBody {
-  /** By feature key (the server's list: thirdEar, spicy, calendar today). */
+  /** By feature key (the server's list: thirdEar, aiCreate, voiceInput, plusPurchases, venueBooking, league, calendarSync, photoUploads). */
   features: Record<string, boolean>;
+  /** The message is kept while maintenance is off (the public read hides it until it is on). */
   maintenance: { enabled: boolean; message: string | null };
-  /** `x.y.z` or null: below it the app shows "update required". */
-  minVersion: string | null;
-  /** `x.y.z` or null: below it the app suggests an update. */
-  recommendedVersion: string | null;
+  /** `MAJOR.MINOR.PATCH` or null: below it the app shows "update required". */
+  minAppVersion: string | null;
+  /** `MAJOR.MINOR.PATCH` or null: below it the app suggests an update. Never below minAppVersion. */
+  recommendedAppVersion: string | null;
 }
 
 export interface FeatureInfo {
@@ -23,9 +25,9 @@ export interface ConfigVersion {
   config: AppConfigBody;
   kind: 'seed' | 'publish' | 'rollback';
   note: string | null;
-  /** For a rollback: the version it brought back. */
+  /** For a rollback: the version it brought back (0 = the defaults). */
   rolledBackFrom: number | null;
-  /** `staff:<id>` or `system`. */
+  /** `staff:<id>`, `system`, or `user:<id>` for a version saved by the v2.0.0 admin route. */
   publishedBy: string;
   publishedByName: string | null;
   publishedAt: string;
@@ -38,9 +40,10 @@ export interface ConfigVersion {
  */
 export interface AppConfigAdmin {
   draft: { config: AppConfigBody; version: number; changed: string[] };
-  /** null before anything was published (the app then gets the default as version 0). */
+  /** null before anything was published (the app then gets the defaults as version 0). */
   published: ConfigVersion | null;
   features: FeatureInfo[];
+  limits: { maintenanceMessageMax: number; noteMax: number };
   updatedAt: string | null;
   updatedBy: string | null;
   updatedByName: string | null;

@@ -41,19 +41,19 @@ export function configDiff(base: AppConfigBody, next: AppConfigBody, features: F
       from: base.maintenance.message ?? 'None',
       to: next.maintenance.message ?? 'None',
     });
-  if (base.minVersion !== next.minVersion)
+  if (base.minAppVersion !== next.minAppVersion)
     out.push({
-      field: 'minVersion',
+      field: 'minAppVersion',
       label: 'Minimum version',
-      from: limit(base.minVersion),
-      to: limit(next.minVersion),
+      from: limit(base.minAppVersion),
+      to: limit(next.minAppVersion),
     });
-  if (base.recommendedVersion !== next.recommendedVersion)
+  if (base.recommendedAppVersion !== next.recommendedAppVersion)
     out.push({
-      field: 'recommendedVersion',
+      field: 'recommendedAppVersion',
       label: 'Recommended version',
-      from: limit(base.recommendedVersion),
-      to: limit(next.recommendedVersion),
+      from: limit(base.recommendedAppVersion),
+      to: limit(next.recommendedAppVersion),
     });
   return out;
 }

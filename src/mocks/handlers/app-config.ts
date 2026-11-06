@@ -1,16 +1,22 @@
-// Remote Config as built on feature/support-remote-config (STAFF_API.md §6 "As built"): the public
-// `GET app-config` (version 0 = the default before anything is published) and the admin view,
-// draft (merges over the current draft), publish, versions and rollback (also replaces the draft).
+// Remote Config as reconciled with v2.0.0 (STAFF_API.md §6): the public `GET app-config` the
+// released app reads ({ version, updatedAt, features, maintenance, minAppVersion,
+// recommendedAppVersion }, version 0 = the defaults before anything is published, the maintenance
+// message hidden while maintenance is off) and the staff routes: the admin view, draft (merges over
+// the current draft), publish, versions and rollback (also replaces the draft; 0 = the defaults).
 // `baseVersion` is the DRAFT's version; every write bumps it; a stale one is 409 CONFIG_CONFLICT.
+// The rules are the backend's applyAppConfigUpdate (libs/common), with its messages.
 import { http, HttpResponse } from 'msw';
 import type { AppConfigBody, ConfigVersion } from '@/features/app-config/api/types';
-import { defaultConfig, MOCK_FEATURES, type AppConfigDraft } from '../data/app-config';
+import { defaultConfig, MOCK_FEATURES, MOCK_LIMITS, type AppConfigDraft } from '../data/app-config';
 import { db, recordAudit } from '../db';
 import { guard, type MockActor } from '../session';
 import { apiError, badRequest, nowIso, p, paginate, readJson } from '../utils';
 
-const MESSAGE_MAX = 280;
-const VERSION_RE = /^(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})$/;
+const MESSAGE_MAX = MOCK_LIMITS.maintenanceMessageMax;
+const NOTE_MAX = MOCK_LIMITS.noteMax;
+const VERSION_RE = /^(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})$/;
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const KEYS = MOCK_FEATURES.map((f) => f.key);
 
 const latest = (): ConfigVersion | null => db().appConfig.versions.at(-1) ?? null;
@@ -42,57 +48,73 @@ function changedFields(a: AppConfigBody, b: AppConfigBody): string[] {
   for (const k of KEYS) if ((a.features[k] ?? true) !== (b.features[k] ?? true)) out.push(`features.${k}`);
   if (a.maintenance.enabled !== b.maintenance.enabled) out.push('maintenance.enabled');
   if (a.maintenance.message !== b.maintenance.message) out.push('maintenance.message');
-  if (a.minVersion !== b.minVersion) out.push('minVersion');
-  if (a.recommendedVersion !== b.recommendedVersion) out.push('recommendedVersion');
+  if (a.minAppVersion !== b.minAppVersion) out.push('minAppVersion');
+  if (a.recommendedAppVersion !== b.recommendedAppVersion) out.push('recommendedAppVersion');
   return out;
 }
 
-/** The backend's applyInput: merges a partial change over the draft and checks every rule. */
+/** The backend's applyAppConfigUpdate: merges a partial change and checks every rule. */
 function applyInput(
   base: AppConfigBody,
   input: Record<string, unknown>,
 ): { config: AppConfigBody } | { problems: string[] } {
   const problems: string[] = [];
-  const features = { ...base.features };
+  const next: AppConfigBody = structuredClone(base);
+  for (const k of Object.keys(input))
+    if (!['features', 'maintenance', 'minAppVersion', 'recommendedAppVersion'].includes(k))
+      problems.push(`${k.slice(0, 40)} is not a Remote Config field`);
   const f = input.features;
   if (f !== undefined) {
-    if (!f || typeof f !== 'object' || Array.isArray(f)) problems.push('features must be an object of switches.');
+    if (!f || typeof f !== 'object' || Array.isArray(f))
+      problems.push('features must be an object of feature switches');
     else
       for (const [k, v] of Object.entries(f)) {
-        if (!KEYS.includes(k)) problems.push(`Unknown feature: ${k}`);
-        else if (typeof v !== 'boolean') problems.push(`features.${k} must be true or false.`);
-        else features[k] = v;
+        if (!KEYS.includes(k))
+          problems.push(`features.${k.slice(0, 40)} is not a feature key (known: ${KEYS.join(', ')})`);
+        else if (typeof v !== 'boolean') problems.push(`features.${k} must be true or false`);
+        else next.features[k] = v;
       }
   }
-  const maintenance = { ...base.maintenance };
-  const m = input.maintenance as { enabled?: unknown; message?: unknown } | undefined;
+  const m = input.maintenance as Record<string, unknown> | null | undefined;
   if (m !== undefined) {
-    if (m.enabled !== undefined) {
-      if (typeof m.enabled !== 'boolean') problems.push('maintenance.enabled must be true or false.');
-      else maintenance.enabled = m.enabled;
-    }
-    if (m.message !== undefined) {
-      const msg = typeof m.message === 'string' ? m.message.trim() : '';
-      if (msg.length > MESSAGE_MAX) problems.push(`The maintenance message can be at most ${MESSAGE_MAX} characters.`);
-      maintenance.message = msg || null;
+    if (!m || typeof m !== 'object' || Array.isArray(m))
+      problems.push('maintenance must be an object with enabled and message');
+    else {
+      if (m.enabled !== undefined) {
+        if (typeof m.enabled !== 'boolean') problems.push('maintenance.enabled must be true or false');
+        else next.maintenance.enabled = m.enabled;
+      }
+      if (m.message !== undefined) {
+        if (m.message === null) next.maintenance.message = null;
+        else if (typeof m.message !== 'string') problems.push('maintenance.message must be text or null');
+        else {
+          const text = m.message.trim();
+          if (text.length > MESSAGE_MAX) problems.push(`maintenance.message is longer than ${MESSAGE_MAX} characters`);
+          else if (CONTROL.test(text)) problems.push('maintenance.message has control characters');
+          else next.maintenance.message = text || null;
+        }
+      }
     }
   }
-  const version = (field: 'minVersion' | 'recommendedVersion'): string | null => {
+  for (const field of ['minAppVersion', 'recommendedAppVersion'] as const) {
     const v = input[field];
-    if (v === undefined) return base[field];
-    if (v === null || v === '') return null;
-    if (typeof v !== 'string' || !VERSION_RE.test(v.trim())) {
-      problems.push(`${field} must look like 1.2.3.`);
-      return null;
-    }
-    return v.trim();
-  };
-  const minVersion = version('minVersion');
-  const recommendedVersion = version('recommendedVersion');
-  if (minVersion && recommendedVersion && cmp(recommendedVersion, minVersion) < 0)
-    problems.push('The recommended version must be the same as or newer than the minimum version.');
-  return problems.length ? { problems } : { config: { features, maintenance, minVersion, recommendedVersion } };
+    if (v === undefined) continue;
+    if (v === null) next[field] = null;
+    else if (typeof v !== 'string' || !VERSION_RE.test(v))
+      problems.push(`${field} must be an app version like 1.4.0 (MAJOR.MINOR.PATCH) or null`);
+    else next[field] = v;
+  }
+  if (!problems.length) {
+    if (next.maintenance.enabled && !next.maintenance.message)
+      problems.push('maintenance.message is required while maintenance is on');
+    if (next.minAppVersion && next.recommendedAppVersion && cmp(next.recommendedAppVersion, next.minAppVersion) < 0)
+      problems.push('recommendedAppVersion can’t be lower than minAppVersion');
+  }
+  return problems.length ? { problems } : { config: next };
 }
+
+const invalid = (problems: string[]) =>
+  apiError(400, 'Some settings aren’t valid.', 'INVALID_CONFIG', { details: problems });
 
 /** GET admin/app-config, and the answer of every write. */
 function adminView() {
@@ -101,6 +123,7 @@ function adminView() {
     draft: { config: structuredClone(d.config), version: d.version, changed: changedFields(liveConfig(), d.config) },
     published: latest() ? structuredClone(latest()) : null,
     features: MOCK_FEATURES,
+    limits: MOCK_LIMITS,
     updatedAt: d.updatedAt,
     updatedBy: d.updatedBy,
     updatedByName: d.updatedByName,
@@ -122,9 +145,20 @@ function checkBase(baseVersion: unknown): Response | null {
 }
 
 function noteProblem(note: unknown): Response | null {
-  return note !== undefined && (typeof note !== 'string' || note.length > 300)
-    ? badRequest('note must be shorter than or equal to 300 characters')
+  return note !== undefined && (typeof note !== 'string' || note.length > NOTE_MAX)
+    ? badRequest(`note must be shorter than or equal to ${NOTE_MAX} characters`)
     : null;
+}
+
+/** The non-text facts the backend audits on publish and rollback (never the note or the message). */
+function summary(previous: AppConfigBody, next: AppConfigBody) {
+  return {
+    featuresOff: KEYS.filter((k) => next.features[k] === false),
+    featuresTurnedOff: KEYS.filter((k) => previous.features[k] !== false && next.features[k] === false),
+    maintenance: next.maintenance.enabled,
+    minAppVersion: next.minAppVersion,
+    recommendedAppVersion: next.recommendedAppVersion,
+  };
 }
 
 /** Claims the draft (bumps its version), then appends the next published version. */
@@ -152,13 +186,21 @@ function release(me: MockActor, config: AppConfigBody, what: Pick<ConfigVersion,
 }
 
 export const appConfigHandlers = [
-  // Public and read-only (the app's route): only the published, public fields; version 0 = default.
+  // Public and read-only (the app's route): only the published, public fields; version 0 = the
+  // defaults. The maintenance message only while maintenance is on.
   http.get(p('app-config'), () => {
     const l = latest();
     const c = liveConfig();
     return HttpResponse.json(
-      { version: l?.version ?? 0, ...c, publishedAt: l?.publishedAt ?? null },
-      { headers: { 'Cache-Control': 'public, max-age=60' } },
+      {
+        version: l?.version ?? 0,
+        updatedAt: l?.publishedAt ?? new Date(0).toISOString(),
+        features: Object.fromEntries(KEYS.map((k) => [k, c.features[k] !== false])),
+        maintenance: { enabled: c.maintenance.enabled, message: c.maintenance.enabled ? c.maintenance.message : null },
+        minAppVersion: c.minAppVersion,
+        recommendedAppVersion: c.recommendedAppVersion,
+      },
+      { headers: { 'Cache-Control': 'public, max-age=30' } },
     );
   }),
 
@@ -174,9 +216,9 @@ export const appConfigHandlers = [
       if (stale) return stale;
       const d = currentDraft();
       const r = applyInput(d.config, config);
-      if ('problems' in r)
-        return apiError(400, 'The config did not pass validation.', 'INVALID_CONFIG', { details: r.problems });
+      if ('problems' in r) return invalid(r.problems);
       const changed = changedFields(d.config, r.config);
+      if (!changed.length) return HttpResponse.json(adminView());
       db().appConfig.draft = {
         config: r.config,
         version: d.version + 1,
@@ -195,14 +237,24 @@ export const appConfigHandlers = [
       const bad = noteProblem(note) ?? checkBase(baseVersion);
       if (bad) return bad;
       const d = currentDraft();
-      const changed = changedFields(liveConfig(), d.config);
+      // A draft saved under older rules is checked again.
+      const checked = applyInput(defaultConfig(), d.config as unknown as Record<string, unknown>);
+      if ('problems' in checked) return invalid(checked.problems);
+      const previous = liveConfig();
+      const previousVersion = latest()?.version ?? 0;
+      const changed = changedFields(previous, d.config);
       if (latest() && !changed.length) return unchanged();
       const version = release(me, d.config, {
         kind: 'publish',
         note: typeof note === 'string' && note.trim() ? note.trim() : null,
         rolledBackFrom: null,
       });
-      recordAudit(me, 'config.publish', 'app_config', { version, changed });
+      recordAudit(me, 'config.publish', 'app_config', {
+        version,
+        previousVersion,
+        changed,
+        ...summary(previous, d.config),
+      });
       return HttpResponse.json(adminView());
     }),
   ),
@@ -222,18 +274,28 @@ export const appConfigHandlers = [
       }>(request);
       const bad = noteProblem(note);
       if (bad) return bad;
-      const old = db().appConfig.versions.find((v) => v.version === version);
-      if (!old) return apiError(404, 'No published Remote Config with that version.', 'CONFIG_VERSION_NOT_FOUND');
+      // 0 = the defaults (every feature on, no maintenance, no version gates).
+      const target =
+        version === 0 ? defaultConfig() : db().appConfig.versions.find((v) => v.version === version)?.config;
+      if (!target) return apiError(404, 'No published Remote Config with that version.', 'CONFIG_VERSION_NOT_FOUND');
       const stale = checkBase(baseVersion);
       if (stale) return stale;
-      const changed = changedFields(liveConfig(), old.config);
+      const previous = liveConfig();
+      const previousVersion = latest()?.version ?? 0;
+      const changed = changedFields(previous, target);
       if (!changed.length) return unchanged();
-      const next = release(me, old.config, {
+      const next = release(me, target, {
         kind: 'rollback',
         note: typeof note === 'string' && note.trim() ? note.trim() : null,
-        rolledBackFrom: old.version,
+        rolledBackFrom: version as number,
       });
-      recordAudit(me, 'config.rollback', 'app_config', { version: next, from: old.version, changed });
+      recordAudit(me, 'config.rollback', 'app_config', {
+        version: next,
+        previousVersion,
+        from: version,
+        changed,
+        ...summary(previous, target),
+      });
       return HttpResponse.json(adminView());
     }),
   ),

@@ -2,8 +2,10 @@ import { z } from 'zod';
 import type { AppConfigBody } from '../api/types';
 
 export const MAINTENANCE_MAX = 280;
-/** x.y.z, numbers only, no leading zeros, up to 9999 each (the backend's APP_VERSION_RE). */
-export const VERSION_RE = /^(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})\.(0|[1-9]\d{0,3})$/;
+/** MAJOR.MINOR.PATCH, numbers only, no leading zeros, up to 99999 each (libs/common isAppVersion). */
+export const VERSION_RE = /^(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})$/;
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 /** -1, 0 or 1 for two `x.y.z` versions. */
 export function compareVersions(a: string, b: string): number {
@@ -25,9 +27,12 @@ export const configFormSchema = z
   .object({
     features: z.record(z.string(), z.boolean()),
     maintenanceEnabled: z.boolean(),
-    maintenanceMessage: z.string().max(MAINTENANCE_MAX, `At most ${MAINTENANCE_MAX} characters.`),
-    minVersion: optionalVersion,
-    recommendedVersion: optionalVersion,
+    maintenanceMessage: z
+      .string()
+      .max(MAINTENANCE_MAX, `At most ${MAINTENANCE_MAX} characters.`)
+      .refine((v) => !CONTROL.test(v.trim()), 'Remove the control characters.'),
+    minAppVersion: optionalVersion,
+    recommendedAppVersion: optionalVersion,
   })
   .superRefine((v, ctx) => {
     if (v.maintenanceEnabled && !v.maintenanceMessage.trim())
@@ -37,13 +42,13 @@ export const configFormSchema = z
         message: 'Write the message people see during maintenance.',
       });
     if (
-      VERSION_RE.test(v.minVersion) &&
-      VERSION_RE.test(v.recommendedVersion) &&
-      compareVersions(v.recommendedVersion, v.minVersion) < 0
+      VERSION_RE.test(v.minAppVersion) &&
+      VERSION_RE.test(v.recommendedAppVersion) &&
+      compareVersions(v.recommendedAppVersion, v.minAppVersion) < 0
     )
       ctx.addIssue({
         code: 'custom',
-        path: ['recommendedVersion'],
+        path: ['recommendedAppVersion'],
         message: 'The recommended version must be the same as or newer than the minimum version.',
       });
   });
@@ -56,8 +61,8 @@ export function toForm(c: AppConfigBody, featureKeys: string[]): ConfigFormValue
     features,
     maintenanceEnabled: c.maintenance.enabled,
     maintenanceMessage: c.maintenance.message ?? '',
-    minVersion: c.minVersion ?? '',
-    recommendedVersion: c.recommendedVersion ?? '',
+    minAppVersion: c.minAppVersion ?? '',
+    recommendedAppVersion: c.recommendedAppVersion ?? '',
   };
 }
 
@@ -66,8 +71,8 @@ export function fromForm(v: ConfigFormValues): AppConfigBody {
   return {
     features: { ...v.features },
     maintenance: { enabled: v.maintenanceEnabled, message: msg || null },
-    minVersion: v.minVersion.trim() || null,
-    recommendedVersion: v.recommendedVersion.trim() || null,
+    minAppVersion: v.minAppVersion.trim() || null,
+    recommendedAppVersion: v.recommendedAppVersion.trim() || null,
   };
 }
 
