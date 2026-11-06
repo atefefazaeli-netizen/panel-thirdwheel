@@ -1,12 +1,20 @@
-// Session lifecycle: restore on load (refresh token in sessionStorage → new access token →
-// admin/me), finish sign-in after a code check, and sign out.
-import { ApiError, endSession, getRefreshToken, refreshSession, setTokens, type TokenPair } from '@/lib/api';
+// Session lifecycle: restore on load (`GET staff/auth/session`), keep the store in step with every
+// session answer, re-read permissions after a refusal, and sign out. Nothing about the session is
+// stored in the browser: the cookie is HttpOnly and the CSRF token stays in module memory.
+import { ApiError, onSession, onSessionEnd, recheckSession } from '@/lib/api';
 import { useSession } from '@/stores/session';
 import { authApi } from './auth-api';
 
+// Every session answer (sign-in, reload, re-check) updates the store; an ended session clears it.
+onSession((info) => useSession.getState().setSession(info.staff, info.restricted));
+onSessionEnd((reason) => {
+  const s = useSession.getState();
+  if (s.status === 'signedIn' || s.status === 'restricted') s.signOut(reason);
+});
+
 let restoring: Promise<void> | null = null;
 
-/** Resolves once the session status is known. Runs the restore at most once per page load. */
+/** Resolves once the session status is known. Runs the restore at most once at a time. */
 export function ensureSession(): Promise<void> {
   if (useSession.getState().status !== 'unknown') return Promise.resolve();
   restoring ??= restore().finally(() => {
@@ -19,28 +27,19 @@ export function ensureSession(): Promise<void> {
 const RESTORE_WAITS_MS = [1000, 3000];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** True for a failure worth retrying: rate limited, server error or no network. */
 function isTransient(e: unknown): boolean {
   if (!(e instanceof ApiError)) return true;
   return e.status == null || e.status === 429 || e.status >= 500;
 }
 
 async function restore(): Promise<void> {
-  if (!getRefreshToken()) {
-    useSession.getState().signOut(null);
-    return;
-  }
   for (let attempt = 0; ; attempt++) {
     try {
-      if (!(await refreshSession())) {
-        useSession.getState().signOut(null);
-        return;
-      }
-      await loadStaff();
+      await authApi.session();
       return;
     } catch (e) {
-      // A busy or briefly unreachable API keeps the tokens and tries again; after that, ask for
-      // a fresh sign-in rather than showing a broken panel.
+      // 401 STAFF_SESSION_REQUIRED: nobody is signed in. A busy or briefly unreachable API is tried
+      // again; after that, ask for a fresh sign-in rather than showing a broken panel.
       if (!isTransient(e) || attempt >= RESTORE_WAITS_MS.length) {
         useSession.getState().signOut(null);
         return;
@@ -50,41 +49,26 @@ async function restore(): Promise<void> {
   }
 }
 
-/** Calls admin/me and records the result: signed in, or no panel access (403). */
-export async function loadStaff(email?: string): Promise<'signedIn' | 'noAccess'> {
-  try {
-    const me = await authApi.me();
-    useSession.getState().signIn(me);
-    return 'signedIn';
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 403 && e.code !== 'ACCOUNT_SUSPENDED') {
-      // A real account without a staff role: end its tokens here, it has nothing to do in the panel.
-      await authApi.logout().catch(() => undefined);
-      endSession('signed_out');
-      useSession.getState().deny(email ?? null);
-      return 'noAccess';
-    }
-    throw e;
-  }
-}
-
-let rechecking: Promise<'signedIn' | 'noAccess' | 'unchanged'> | null = null;
+let rechecking: Promise<'signedIn' | 'restricted' | 'signedOut' | 'unchanged'> | null = null;
 let lastRecheck = 0;
 const RECHECK_GAP_MS = 5_000;
 
 /**
- * The API refused a call for the role (403 INSUFFICIENT_ROLE): the staff member's roles changed
- * since sign-in (the server reads ADMIN_EMAILS / CLINICIAN_EMAILS on every request). Re-reads
- * admin/me once (single flight, at most every 5 seconds) so RoleGate and the sidebar follow, or
- * moves to the no-access screen when no staff role is left.
+ * The API refused a call for a missing permission: the account's roles changed since the session
+ * was loaded (an Owner edited them). Re-reads the session once (single flight, at most every
+ * 5 seconds) so `Can`, route guards and the sidebar follow.
  */
-export function recheckRoles(now = Date.now()): Promise<'signedIn' | 'noAccess' | 'unchanged'> {
+export function recheckPermissions(now = Date.now()): Promise<'signedIn' | 'restricted' | 'signedOut' | 'unchanged'> {
   if (rechecking) return rechecking;
-  if (useSession.getState().status !== 'signedIn' || now - lastRecheck < RECHECK_GAP_MS)
+  const status = useSession.getState().status;
+  if ((status !== 'signedIn' && status !== 'restricted') || now - lastRecheck < RECHECK_GAP_MS)
     return Promise.resolve('unchanged');
   lastRecheck = now;
-  const email = useSession.getState().user?.email;
-  rechecking = loadStaff(email)
+  rechecking = recheckSession()
+    .then(
+      (info) =>
+        (info ? (info.restricted ? 'restricted' : 'signedIn') : 'signedOut') as 'signedIn' | 'restricted' | 'signedOut',
+    )
     .catch(() => 'unchanged' as const)
     .finally(() => {
       rechecking = null;
@@ -93,17 +77,12 @@ export function recheckRoles(now = Date.now()): Promise<'signedIn' | 'noAccess' 
 }
 
 /** For tests. */
-export function __resetRecheckForTests(): void {
+export function __resetSessionForTests(): void {
   rechecking = null;
   lastRecheck = 0;
-}
-
-export async function completeSignIn(tokens: TokenPair, email: string): Promise<'signedIn' | 'noAccess'> {
-  setTokens(tokens);
-  return loadStaff(email);
+  restoring = null;
 }
 
 export async function signOut(): Promise<void> {
   await authApi.logout().catch(() => undefined);
-  endSession('signed_out');
 }

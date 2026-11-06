@@ -22,12 +22,17 @@ export const useAdminStats = (enabled = true) =>
     enabled,
   });
 
-export const useReviewPreview = () =>
-  useQuery({ queryKey: dashboardKeys.review(), queryFn: () => contentApi.list({ state: 'in_review', limit: 5 }) });
-export const useHighFlagsPreview = () =>
+export const useReviewPreview = (enabled = true) =>
+  useQuery({
+    queryKey: dashboardKeys.review(),
+    queryFn: () => contentApi.list({ state: 'in_review', limit: 5 }),
+    enabled,
+  });
+export const useHighFlagsPreview = (enabled = true) =>
   useQuery({
     queryKey: dashboardKeys.highFlags(),
     queryFn: () => safetyApi.list({ status: 'open', level: 'high', limit: 5 }),
+    enabled,
   });
 export const useFailedDeliveries = (enabled: boolean) =>
   useQuery({

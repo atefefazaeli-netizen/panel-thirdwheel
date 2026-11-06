@@ -1,10 +1,12 @@
 import { daysAgo, oid } from '../utils';
+import { staffId } from './staff';
 import { uid } from './users';
 
 export interface AuditEntry {
   id: string;
   actor: string;
   actorEmail: string | null;
+  actorName?: string | null;
   action: string;
   target: string;
   meta: Record<string, unknown>;
@@ -14,24 +16,27 @@ export interface AuditEntry {
 export function seedAudit(): AuditEntry[] {
   const rows: Omit<AuditEntry, 'id'>[] = [
     {
-      actor: uid('lead'),
-      actorEmail: 'lead@thirdwheel.app',
+      actor: `staff:${staffId('editor')}`,
+      actorEmail: null,
+      actorName: 'Huda Karim',
       action: 'content.submit',
       target: 'content:my-perfect-day',
       meta: { note: 'Reworded card 3' },
       at: daysAgo(0, 3),
     },
     {
-      actor: uid('doctor'),
-      actorEmail: 'dr.noor@thirdwheel.app',
+      actor: `staff:${staffId('reviewer')}`,
+      actorEmail: null,
+      actorName: 'Dr. Noor Rahman',
       action: 'content.request_changes',
       target: 'content:money-date-30-minutes',
       meta: {},
       at: daysAgo(1, 2),
     },
     {
-      actor: uid('lead'),
-      actorEmail: 'lead@thirdwheel.app',
+      actor: `staff:${staffId('editor')}`,
+      actorEmail: null,
+      actorName: 'Huda Karim',
       action: 'user.plus_grant',
       target: `user:${uid('sara')}`,
       meta: { days: 30 },
@@ -46,32 +51,36 @@ export function seedAudit(): AuditEntry[] {
       at: daysAgo(3),
     },
     {
-      actor: uid('lead'),
-      actorEmail: 'lead@thirdwheel.app',
+      actor: `staff:${staffId('editor')}`,
+      actorEmail: null,
+      actorName: 'Huda Karim',
       action: 'webhook.create',
       target: `webhook:${oid('wh:crisis')}`,
       meta: { events: ['crisis.alert'] },
       at: daysAgo(6),
     },
     {
-      actor: uid('doctor'),
-      actorEmail: 'dr.noor@thirdwheel.app',
+      actor: `staff:${staffId('reviewer')}`,
+      actorEmail: null,
+      actorName: 'Dr. Noor Rahman',
       action: 'safety.review',
       target: `safety_flag:${oid('flag:4')}`,
       meta: {},
       at: daysAgo(4),
     },
     {
-      actor: uid('lead'),
-      actorEmail: 'lead@thirdwheel.app',
+      actor: `staff:${staffId('editor')}`,
+      actorEmail: null,
+      actorName: 'Huda Karim',
       action: 'ai.settings.update',
       target: 'ai-settings:3',
       meta: { version: 3 },
       at: daysAgo(5),
     },
     {
-      actor: uid('lead'),
-      actorEmail: 'lead@thirdwheel.app',
+      actor: `staff:${staffId('editor')}`,
+      actorEmail: null,
+      actorName: 'Huda Karim',
       action: 'user.suspend',
       target: `user:${uid('sam')}`,
       meta: { reason: 'Spam sign-ups' },

@@ -1,4 +1,5 @@
-import { LogOutIcon } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { LogOutIcon, UserRoundCogIcon } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,39 +13,49 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { initials } from '@/lib/format';
-import type { StaffUser } from '@/stores/session';
+import type { StaffMe } from '@/stores/session';
 
 export interface UserMenuProps {
-  user: StaffUser;
+  staff: StaffMe;
   onSignOut: () => void;
 }
 
-export function UserMenu({ user, onSignOut }: UserMenuProps) {
+/** Role keys as words for the menu (display only; nothing is decided on them). */
+const roleLabel = (key: string) => key.replace(/_/g, ' ');
+
+export function UserMenu({ staff, onSignOut }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-9 gap-2 px-1.5" aria-label={`Account: ${user.email}`}>
+        <Button variant="ghost" size="sm" className="h-9 gap-2 px-1.5" aria-label={`Account: ${staff.displayName}`}>
           <Avatar className="size-7">
             <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
-              {initials(user.email)}
+              {initials(staff.displayName || staff.username)}
             </AvatarFallback>
           </Avatar>
-          <span className="hidden max-w-40 truncate text-sm font-medium lg:inline">{user.email}</span>
+          <span className="hidden max-w-40 truncate text-sm font-medium lg:inline">{staff.displayName}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex flex-col gap-1.5">
-          <span className="truncate text-sm">{user.email}</span>
-          <span className="flex gap-1">
-            {user.roles.map((r) => (
+          <span className="truncate text-sm">{staff.displayName}</span>
+          <span className="truncate font-mono text-xs font-normal text-muted-foreground">{staff.username}</span>
+          <span className="flex flex-wrap gap-1">
+            {staff.roles.map((r) => (
               <Badge key={r} variant="secondary" className="capitalize">
-                {r}
+                {roleLabel(r)}
               </Badge>
             ))}
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          <DropdownMenuItem asChild>
+            <Link to="/account">
+              <UserRoundCogIcon />
+              My account
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={onSignOut}>
             <LogOutIcon />
             Sign out

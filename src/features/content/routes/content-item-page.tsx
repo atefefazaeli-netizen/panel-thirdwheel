@@ -11,7 +11,7 @@ import { Form } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError, errorMessage } from '@/lib/api';
-import { useRoles } from '@/stores/session';
+import { useCan, usePermissions, useSession } from '@/stores/session';
 import { contentApi } from '../api/content-api';
 import {
   contentKeys,
@@ -72,7 +72,9 @@ function Editor({ item }: { item: ContentItem }) {
   const { tab = 'catalog' } = route.useSearch();
   const navigate = route.useNavigate();
   const qc = useQueryClient();
-  const { isAdmin, user } = useRoles();
+  const staff = useSession((s) => s.staff);
+  const permissions = usePermissions();
+  const canEdit = useCan('content.edit');
   const facets = useContentFacets();
   const { form, baseRev, stale, markConflict, resetTo, setWriting } = useContentEditor(item);
   const { isDirty, isValid } = useFormState({ control: form.control });
@@ -89,8 +91,8 @@ function Editor({ item }: { item: ContentItem }) {
   const rollback = useRollbackContent(item.id);
   const busy = [save, discard, submit, approve, changes, unpublish, restore, rollback].some((m) => m.isPending);
 
-  const readOnly = !isAdmin;
-  const wf = workflowFor(item, user?.roles ?? [], { dirty: isDirty, valid: isValid, busy, stale });
+  const readOnly = !canEdit;
+  const wf = workflowFor(item, [...permissions], { dirty: isDirty, valid: isValid, busy, stale });
   const blocker = useUnsavedGuard(isDirty && !readOnly);
   const plays = playsField(item.kind);
   const title = (editableSnapshot(item).catalog.title as string) || item.id;
@@ -127,7 +129,11 @@ function Editor({ item }: { item: ContentItem }) {
   const reload = async () => {
     setReloading(true);
     try {
-      const fresh = await qc.fetchQuery({ queryKey: contentKeys.item(item.id), queryFn: () => contentApi.get(item.id), staleTime: 0 });
+      const fresh = await qc.fetchQuery({
+        queryKey: contentKeys.item(item.id),
+        queryFn: () => contentApi.get(item.id),
+        staleTime: 0,
+      });
       resetTo(fresh);
       setProblems(null);
     } catch (e) {
@@ -152,7 +158,8 @@ function Editor({ item }: { item: ContentItem }) {
         if (!details) return;
         // Field-level: mark each field the server named; list everything above the tabs.
         const { mapped } = detailsToFieldErrors(details);
-        for (const m of mapped) form.setError(m.path as FieldPath<EditorValues>, { type: 'server', message: m.message });
+        for (const m of mapped)
+          form.setError(m.path as FieldPath<EditorValues>, { type: 'server', message: m.message });
         setProblems(details);
       }
     },
@@ -182,7 +189,7 @@ function Editor({ item }: { item: ContentItem }) {
       />
       <WorkflowBar
         item={item}
-        userId={user?.userId}
+        userId={staff ? `staff:${staff.id}` : undefined}
         workflow={wf}
         dirty={isDirty}
         onSave={() => void onSave()}
@@ -201,7 +208,9 @@ function Editor({ item }: { item: ContentItem }) {
         <Alert>
           <InfoIcon />
           <AlertTitle>Read only</AlertTitle>
-          <AlertDescription>Clinicians review and approve here. Admins edit drafts.</AlertDescription>
+          <AlertDescription>
+            Your role can't edit drafts. Reviewers approve here; editors change drafts.
+          </AlertDescription>
         </Alert>
       )}
       {problems && (

@@ -10,6 +10,7 @@ import {
 } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { errorMessage } from '@/lib/api';
+import { useCan } from '@/stores/session';
 import { formatDateTime, formatRelative } from '@/lib/format';
 import { useDeliveries, useRetryDelivery, useWebhooks } from '../api/queries';
 import { DELIVERY_EVENTS, DELIVERY_STATUSES, type Delivery } from '../api/types';
@@ -28,6 +29,7 @@ export function DeliveriesTab({ search, set, onReset }: DeliveriesTabProps) {
   const list = useDeliveries({ webhookId: search.webhookId, event: search.event, status: search.status, page, limit });
   const hooks = useWebhooks();
   const retry = useRetryDelivery();
+  const canManage = useCan('integrations.manage');
   const nameOf = (id: string) => hooks.data?.find((w) => w.id === id)?.name ?? 'Deleted webhook';
   const open = list.data?.items.find((d) => d.id === search.delivery) ?? null;
 
@@ -79,7 +81,7 @@ export function DeliveriesTab({ search, set, onReset }: DeliveriesTabProps) {
       enableHiding: false,
       meta: { className: 'w-24 text-right' },
       cell: (c) =>
-        c.row.original.status !== 'pending' ? (
+        canManage && c.row.original.status !== 'pending' ? (
           <Button
             variant="ghost"
             size="sm"
@@ -148,7 +150,8 @@ export function DeliveriesTab({ search, set, onReset }: DeliveriesTabProps) {
         description={open ? `${nameOf(open.webhookId)} · ${formatDateTime(open.createdAt)}` : undefined}
         size="xl"
         footer={
-          open && (
+          open &&
+          canManage && (
             <Button onClick={() => void doRetry(open)} disabled={open.status === 'pending' || retry.isPending}>
               <RotateCwIcon />
               Retry delivery

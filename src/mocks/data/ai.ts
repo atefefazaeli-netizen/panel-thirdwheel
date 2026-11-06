@@ -3,7 +3,7 @@
 // API's environment.
 import type { AiRuntimeSettings, AiSettingsInput } from '@/features/ai-engine/api/types';
 import { daysAgo } from '../utils';
-import { uid } from './users';
+import { staffId } from './staff';
 
 export const AI_MODES = [
   'vent',
@@ -65,6 +65,7 @@ export interface AiVersion {
   note: string | null;
   updatedBy: string | null;
   updatedByEmail: string | null;
+  updatedByName?: string | null;
   createdAt: string;
 }
 
@@ -81,7 +82,7 @@ export const runtimeOf = (v: AiVersion): AiRuntimeSettings => ({
 });
 
 export function seedAi(): AiState {
-  const lead = uid('lead');
+  const lead = `staff:${staffId('owner')}`;
   const v1: AiSettingsInput = structuredClone(ENV_DEFAULTS);
   const v2: AiSettingsInput = { ...structuredClone(v1), anthropic: { ...v1.anthropic, effort: 'medium' } };
   const v3: AiSettingsInput = structuredClone(v2);
@@ -97,7 +98,8 @@ export function seedAi(): AiState {
         settings: v1,
         note: 'First saved settings (environment defaults).',
         updatedBy: lead,
-        updatedByEmail: 'lead@thirdwheel.app',
+        updatedByEmail: null,
+        updatedByName: 'Rania Aziz',
         createdAt: daysAgo(12),
       },
       {
@@ -105,7 +107,8 @@ export function seedAi(): AiState {
         settings: v2,
         note: 'Medium effort for better vent replies.',
         updatedBy: lead,
-        updatedByEmail: 'lead@thirdwheel.app',
+        updatedByEmail: null,
+        updatedByName: 'Rania Aziz',
         createdAt: daysAgo(9),
       },
       {
@@ -113,7 +116,8 @@ export function seedAi(): AiState {
         settings: v3,
         note: 'Clinician wording for the vent task line.',
         updatedBy: lead,
-        updatedByEmail: 'lead@thirdwheel.app',
+        updatedByEmail: null,
+        updatedByName: 'Rania Aziz',
         createdAt: daysAgo(5),
       },
     ],

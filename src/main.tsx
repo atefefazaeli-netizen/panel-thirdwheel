@@ -1,22 +1,27 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '@/app/app';
+import { env } from '@/config/env';
 import '@/styles/globals.css';
 
-async function enableMocks(): Promise<void> {
-  // Written out (not env.useMocks) so production builds without VITE_API_MOCKS=1 drop the mock
-  // chunk entirely: the condition is a constant at build time.
-  const forced = import.meta.env.VITE_API_MOCKS === '1';
-  const off = import.meta.env.VITE_API_MOCKS === '0';
-  if (!(forced || (!off && import.meta.env.DEV && !import.meta.env.VITE_API_URL))) return;
-  const { worker } = await import('@/mocks/browser');
-  await worker.start({ onUnhandledFrame: 'bypass', quiet: true });
-  // Loud on purpose: a demo build must never pass for the real panel (the banner says so too).
-  document.title = `[DEMO DATA] ${document.title}`;
-  console.warn('Thirdwheel panel: demo data from the in-browser mock API, not the real API.');
+async function enableDevMocks(): Promise<void> {
+  // `import.meta.env.DEV` is a build-time constant: production builds drop this whole block, the
+  // mock API, its seed data and the dev UI (checked by `npm run check:prod-bundle`).
+  if (import.meta.env.DEV) {
+    if (!env.useMocks) return;
+    const [{ worker }, dev, { registerDevUi }] = await Promise.all([
+      import('@/mocks/browser'),
+      import('@/mocks/dev-ui'),
+      import('@/config/dev-ui'),
+    ]);
+    await worker.start({ onUnhandledFrame: 'bypass', quiet: true });
+    registerDevUi({ Banner: dev.DevMockBanner, LoginHint: dev.DevLoginHint });
+    document.title = `[MOCK API] ${document.title}`;
+    console.warn('Thirdwheel panel: development mock API (MSW), not the real API.');
+  }
 }
 
-void enableMocks().then(() => {
+void enableDevMocks().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

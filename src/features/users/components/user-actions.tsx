@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDate } from '@/lib/format';
-import { useSession } from '@/stores/session';
+import { useCan } from '@/stores/session';
 import {
   useDeleteUser,
   useEndGrant,
@@ -52,10 +52,16 @@ export function UserActions({ user }: { user: AdminUserDetail }) {
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const close = (o: boolean) => !o && setDialog(null);
   const navigate = useNavigate();
-  const me = useSession((s) => s.user);
   const id = user.account.userId;
-  const self = me?.userId === id;
-  const staff = user.account.roles.includes('admin') || user.account.roles.includes('clinician');
+  // One permission per action (STAFF_API.md §4). Staff are not app users, so there is no "self".
+  const can = {
+    signout: useCan('users.signout'),
+    suspend: useCan('users.suspend'),
+    tags: useCan('users.tags'),
+    plus: useCan('users.plus'),
+    unlink: useCan('users.unlink'),
+    del: useCan('users.delete'),
+  };
   const who = user.profile?.name ?? user.account.email ?? id;
 
   const signOut = useSignOutUser();
@@ -67,6 +73,11 @@ export function UserActions({ user }: { user: AdminUserDetail }) {
   const unlink = useUnlinkUser();
   const remove = useDeleteUser();
 
+  if (!Object.values(can).some(Boolean)) return null;
+  const showAccount = can.signout || can.suspend || can.tags;
+  const showPlus = can.plus;
+  const showOther = (can.unlink && !!user.couple) || can.del;
+
   return (
     <>
       <DropdownMenu>
@@ -77,55 +88,74 @@ export function UserActions({ user }: { user: AdminUserDetail }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuLabel>Account</DropdownMenuLabel>
-          <DropdownMenuGroup>
-            <DropdownMenuItem onSelect={() => setDialog('signout')}>
-              <LogOutIcon />
-              Sign out everywhere
-            </DropdownMenuItem>
-            {user.account.suspended ? (
-              <DropdownMenuItem onSelect={() => setDialog('unsuspend')}>
-                <ShieldCheckIcon />
-                Unsuspend
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onSelect={() => setDialog('suspend')} disabled={self}>
-                <BanIcon />
-                Suspend
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onSelect={() => setDialog('tags')}>
-              <TagIcon />
-              Edit tags
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Plus</DropdownMenuLabel>
-          <DropdownMenuGroup>
-            <DropdownMenuItem onSelect={() => setDialog('grant')}>
-              <CrownIcon />
-              {user.subscription?.grant ? 'Extend grant' : 'Grant Plus'}
-            </DropdownMenuItem>
-            {user.subscription?.grant && (
-              <DropdownMenuItem onSelect={() => setDialog('endGrant')}>
-                <XCircleIcon />
-                End grant
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            {user.couple && (
-              <DropdownMenuItem onSelect={() => setDialog('unlink')}>
-                <HeartCrackIcon />
-                Unlink partner
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem variant="destructive" onSelect={() => setDialog('delete')} disabled={self || staff}>
-              <Trash2Icon />
-              Delete account
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          {showAccount && (
+            <>
+              <DropdownMenuLabel>Account</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                {can.signout && (
+                  <DropdownMenuItem onSelect={() => setDialog('signout')}>
+                    <LogOutIcon />
+                    Sign out everywhere
+                  </DropdownMenuItem>
+                )}
+                {can.suspend &&
+                  (user.account.suspended ? (
+                    <DropdownMenuItem onSelect={() => setDialog('unsuspend')}>
+                      <ShieldCheckIcon />
+                      Unsuspend
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onSelect={() => setDialog('suspend')}>
+                      <BanIcon />
+                      Suspend
+                    </DropdownMenuItem>
+                  ))}
+                {can.tags && (
+                  <DropdownMenuItem onSelect={() => setDialog('tags')}>
+                    <TagIcon />
+                    Edit tags
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+            </>
+          )}
+          {showPlus && (
+            <>
+              {showAccount && <DropdownMenuSeparator />}
+              <DropdownMenuLabel>Plus</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => setDialog('grant')}>
+                  <CrownIcon />
+                  {user.subscription?.grant ? 'Extend grant' : 'Grant Plus'}
+                </DropdownMenuItem>
+                {user.subscription?.grant && (
+                  <DropdownMenuItem onSelect={() => setDialog('endGrant')}>
+                    <XCircleIcon />
+                    End grant
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+            </>
+          )}
+          {showOther && (
+            <>
+              {(showAccount || showPlus) && <DropdownMenuSeparator />}
+              <DropdownMenuGroup>
+                {can.unlink && user.couple && (
+                  <DropdownMenuItem onSelect={() => setDialog('unlink')}>
+                    <HeartCrackIcon />
+                    Unlink partner
+                  </DropdownMenuItem>
+                )}
+                {can.del && (
+                  <DropdownMenuItem variant="destructive" onSelect={() => setDialog('delete')}>
+                    <Trash2Icon />
+                    Delete account
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -199,7 +229,7 @@ export function UserActions({ user }: { user: AdminUserDetail }) {
         open={dialog === 'grant'}
         onOpenChange={close}
         title="Grant Plus"
-        description={`Plus by admin grant from today. One plan covers both partners${user.couple ? `, so ${user.couple.partner.name ?? 'the partner'} gets it too` : ''}. There is no trial.`}
+        description={`Plus by staff grant from today. One plan covers both partners${user.couple ? `, so ${user.couple.partner.name ?? 'the partner'} gets it too` : ''}. There is no trial.`}
         schema={grantSchema}
         defaultValues={{ days: 30, note: '' }}
         submitLabel="Grant Plus"

@@ -7,7 +7,7 @@ import { renderRoute } from '@/test/utils';
 describe('legacy catalog (mock API)', () => {
   it('edits an idea with a live preview and keeps hidden ranking tags', async () => {
     const user = userEvent.setup();
-    renderRoute('/catalog', { roles: ['admin'] });
+    renderRoute('/catalog', { roles: ['content_editor'] });
     expect(await screen.findAllByText('Legacy (round 1)')).not.toHaveLength(0);
     await user.click(await screen.findByText('Beginner padel for two'));
     const drawer = await screen.findByRole('dialog');
@@ -26,7 +26,7 @@ describe('legacy catalog (mock API)', () => {
     const user = userEvent.setup();
     db().legacy.retired.add(Math.max(...db().legacy.items.map((i) => i.id)));
     const top = Math.max(...db().legacy.items.map((i) => i.id));
-    renderRoute('/catalog', { roles: ['admin'] });
+    renderRoute('/catalog', { roles: ['content_editor'] });
     await user.click(await screen.findByText('Beginner padel for two'));
     const editDrawer = await screen.findByRole('dialog');
     expect(within(editDrawer).getByText('competitive')).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe('legacy catalog (mock API)', () => {
 
   it('adds and retires an experience', async () => {
     const user = userEvent.setup();
-    renderRoute('/experiences', { roles: ['admin'] });
+    renderRoute('/experiences', { roles: ['content_editor'] });
     await user.click(await screen.findByRole('button', { name: 'New experience' }));
     const drawer = await screen.findByRole('dialog');
     await user.type(within(drawer).getByRole('textbox', { name: 'Id' }), 'x-sunset-walk');

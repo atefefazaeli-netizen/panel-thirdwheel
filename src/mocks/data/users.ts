@@ -149,7 +149,7 @@ export function seedUsers(): Map<string, MockUser> {
     tokenVersion: 0,
   });
   add({
-    account: account(uid('lead'), 'lead@thirdwheel.app', 60, { roles: ['admin', 'clinician'], tags: ['staff'] }),
+    account: account(uid('lead'), 'lead@thirdwheel.app', 60, { tags: ['staff'] }),
     name: 'Lead',
     profile: null,
     couple: null,
@@ -157,7 +157,7 @@ export function seedUsers(): Map<string, MockUser> {
     tokenVersion: 0,
   });
   add({
-    account: account(uid('doctor'), 'dr.noor@thirdwheel.app', 55, { roles: ['clinician'], tags: ['staff'] }),
+    account: account(uid('doctor'), 'dr.noor@thirdwheel.app', 55, { tags: ['staff'] }),
     name: 'Dr. Noor',
     profile: null,
     couple: null,

@@ -70,14 +70,14 @@ export const legacyHandlers = [
 
   // Admin list: tags and refPrefix included.
   http.get(p('catalog/admin/items'), ({ request }) =>
-    guard(request, 'admin', () => {
+    guard(request, 'catalog.manage', () => {
       const url = new URL(request.url);
       return HttpResponse.json(paginate(listItems(url), url));
     }),
   ),
 
   http.post(p('catalog/items'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'catalog.manage', async (me) => {
       const b = await readJson<Partial<CatalogItem>>(request);
       if (b.id !== undefined && (!Number.isInteger(b.id) || b.id < 1 || b.id > 1_000_000))
         return badRequest('id must not be less than 1');
@@ -99,7 +99,7 @@ export const legacyHandlers = [
   ),
 
   http.patch(p('catalog/items/:id'), ({ request, params }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'catalog.manage', async (me) => {
       const item = db().legacy.items.find((i) => i.id === Number(params.id) && !db().legacy.retired.has(i.id));
       if (!item) return apiError(404, 'Idea not found', 'CATALOG_ITEM_NOT_FOUND');
       const { id: _ignored, ...patch } = await readJson<Partial<CatalogItem>>(request);
@@ -112,7 +112,7 @@ export const legacyHandlers = [
   ),
 
   http.delete(p('catalog/items/:id'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'catalog.manage', (me) => {
       const id = Number(params.id);
       if (!db().legacy.items.some((i) => i.id === id) || db().legacy.retired.has(id))
         return apiError(404, 'Idea not found', 'CATALOG_ITEM_NOT_FOUND');
@@ -137,7 +137,7 @@ export const legacyHandlers = [
   }),
 
   http.post(p('experiences'), ({ request }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'catalog.manage', async (me) => {
       const b = await readJson<Record<string, unknown>>(request);
       if (typeof b.id !== 'string' || !SLUG.test(b.id)) return badRequest('id must match /^[a-z0-9-]{2,40}$/');
       if (!EXPS.includes(b.exp as string))
@@ -153,7 +153,7 @@ export const legacyHandlers = [
   ),
 
   http.patch(p('experiences/:id'), ({ request, params }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'catalog.manage', async (me) => {
       const x = db().legacy.experiences.find((e) => e.id === params.id && !db().legacy.retiredXp.has(e.id));
       if (!x) return apiError(404, 'Experience not found', 'EXPERIENCE_NOT_FOUND');
       const { id: _ignored, ...patch } = await readJson<Record<string, unknown>>(request);
@@ -166,7 +166,7 @@ export const legacyHandlers = [
   ),
 
   http.delete(p('experiences/:id'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'catalog.manage', (me) => {
       if (!db().legacy.experiences.some((x) => x.id === params.id) || db().legacy.retiredXp.has(String(params.id)))
         return apiError(404, 'Experience not found', 'EXPERIENCE_NOT_FOUND');
       db().legacy.retiredXp.add(String(params.id));
@@ -176,7 +176,7 @@ export const legacyHandlers = [
   ),
 
   http.get(p('ideas/:id/booking-link'), ({ request, params }) =>
-    guard(request, 'user', () => {
+    guard(request, 'session', () => {
       const id = String(params.id);
       if (!CARD.test(id)) return badRequest('id must match /^[a-z0-9][a-z0-9-]{0,39}$/');
       const link = db().legacy.links.get(id);
@@ -193,7 +193,7 @@ export const legacyHandlers = [
   ),
 
   http.put(p('ideas/:id/booking-link'), ({ request, params }) =>
-    guard(request, 'admin', async (me) => {
+    guard(request, 'catalog.manage', async (me) => {
       const id = String(params.id);
       const b = await readJson<{ url?: string; venue?: string | null; paid?: boolean }>(request);
       const ok = (() => {
@@ -217,7 +217,7 @@ export const legacyHandlers = [
   ),
 
   http.delete(p('ideas/:id/booking-link'), ({ request, params }) =>
-    guard(request, 'admin', (me) => {
+    guard(request, 'catalog.manage', (me) => {
       if (!db().legacy.links.delete(String(params.id)))
         return apiError(404, 'No venue page for this card', 'BOOKING_LINK_NOT_FOUND');
       recordAudit(me, 'booking_link.remove', `booking_link:${String(params.id)}`);

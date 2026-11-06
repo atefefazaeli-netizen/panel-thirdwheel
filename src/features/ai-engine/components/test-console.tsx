@@ -1,13 +1,15 @@
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlayIcon } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { FormFieldSelect, FormFieldSwitch, FormFieldTextarea, StatusBadge } from '@/components/shared';
+import { LockKeyholeIcon, PlayIcon } from 'lucide-react';
+import { useForm, useWatch } from 'react-hook-form';
+import { FormFieldSelect, FormFieldSwitch, FormFieldText, FormFieldTextarea, StatusBadge } from '@/components/shared';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
+import { useContentList } from '@/features/content/api/queries';
 import { errorMessage } from '@/lib/api';
+import { useCan } from '@/stores/session';
 import { useAiTest } from '../api/queries';
 import type { AiSettingsInput, AiTestResult } from '../api/types';
 import { testSchema, TEST_TEXT_MAX } from '../schemas/ai';
@@ -26,28 +28,55 @@ const SOURCE_COPY: Record<AiTestResult['source'], { label: string; help: string 
   },
 };
 
-/** Try a message against the current settings, or the unsaved ones. Nothing is stored. */
+/** Suggestions for the content picker (needs content.read; otherwise the id is typed by hand). */
+function ContentSuggestions({ id, q }: { id: string; q: string }) {
+  const list = useContentList({ q: q || undefined, state: 'live', limit: 20 });
+  return (
+    <datalist id={id}>
+      {list.data?.items.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.title ?? c.id}
+        </option>
+      ))}
+    </datalist>
+  );
+}
+
+/**
+ * Try a message against the current settings, or the unsaved ones (STAFF_API.md §7). The console
+ * never reads app-user data; the only optional context is one item's published content. Nothing is
+ * stored.
+ */
 export function TestConsole({
   modes,
   getDraft,
   dirty,
+  canUseDraft = true,
 }: {
   modes: string[];
   getDraft: () => AiSettingsInput | null;
   dirty: boolean;
+  /** False when the page has no settings form (ai.test without ai.read). */
+  canUseDraft?: boolean;
 }) {
   const test = useAiTest();
+  const canSearchContent = useCan('content.read');
+  const listId = React.useId();
   const form = useForm({
     resolver: zodResolver(testSchema),
-    defaultValues: { mode: modes[0] ?? 'vent', text: '', useDraft: false },
+    defaultValues: { mode: modes[0] ?? 'vent', text: '', useDraft: false, useContent: false, contentId: '' },
   });
+  const useContent = useWatch({ control: form.control, name: 'useContent' });
+  const contentId = useWatch({ control: form.control, name: 'contentId' }) ?? '';
   const [draftError, setDraftError] = React.useState(false);
-  const submit = form.handleSubmit(async ({ mode, text, useDraft }) => {
+  const submit = form.handleSubmit(async ({ mode, text, useDraft, useContent: withContent, contentId: cid }) => {
     const draft = useDraft ? getDraft() : null;
     // Never fall back to the saved settings silently when the unsaved ones were asked for.
     setDraftError(useDraft && !draft);
     if (useDraft && !draft) return;
-    await test.mutateAsync({ mode, text, ...(draft ? { draft } : {}) }).catch(() => undefined);
+    await test
+      .mutateAsync({ mode, text, ...(draft ? { draft } : {}), ...(withContent && cid ? { contentId: cid } : {}) })
+      .catch(() => undefined);
   });
   const r = test.data;
   return (
@@ -58,6 +87,15 @@ export function TestConsole({
           Runs the safety check first, then the model. Nothing is stored. Limited to 10 a minute.
         </CardDescription>
       </CardHeader>
+      <CardContent className="pb-0">
+        <Alert className="mb-4">
+          <LockKeyholeIcon />
+          <AlertDescription>
+            The console has no access to user data: no profiles, chats or safety data. Write test messages yourself, and
+            never paste anything a real person wrote. Runs are audited without the text.
+          </AlertDescription>
+        </Alert>
+      </CardContent>
       <CardContent>
         <Form {...form}>
           <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
@@ -71,14 +109,35 @@ export function TestConsole({
               ]}
             />
             <FormFieldTextarea control={form.control} name="text" label="Message" rows={3} maxLength={TEST_TEXT_MAX} />
+            {canUseDraft && (
+              <FormFieldSwitch
+                control={form.control}
+                name="useDraft"
+                label="Use unsaved changes"
+                description={
+                  dirty ? 'Try the settings on this page before saving them.' : 'No unsaved changes right now.'
+                }
+              />
+            )}
             <FormFieldSwitch
               control={form.control}
-              name="useDraft"
-              label="Use unsaved changes"
-              description={
-                dirty ? 'Try the settings on this page before saving them.' : 'No unsaved changes right now.'
-              }
+              name="useContent"
+              label="Use published content as context"
+              description="Adds one item's published version (read only) to the test prompt. Drafts are never used."
             />
+            {useContent && (
+              <div className="flex flex-col gap-1">
+                <FormFieldText
+                  control={form.control}
+                  name="contentId"
+                  label="Content id"
+                  placeholder="my-perfect-day"
+                  autoComplete="off"
+                  listId={canSearchContent ? listId : undefined}
+                />
+                {canSearchContent && <ContentSuggestions id={listId} q={contentId} />}
+              </div>
+            )}
             <Button type="submit" className="self-start" disabled={test.isPending}>
               <PlayIcon />
               {test.isPending ? 'Running…' : 'Run'}

@@ -6,12 +6,14 @@ import type { BaseFieldProps } from './types';
 
 export interface FormFieldTextProps<T extends FieldValues, N extends FieldPath<T>> extends BaseFieldProps<T, N> {
   placeholder?: string;
-  type?: 'text' | 'email' | 'url' | 'search' | 'date';
+  type?: 'text' | 'email' | 'url' | 'search' | 'date' | 'password';
   autoComplete?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
   maxLength?: number;
   /** Empty input stores null instead of "". */
   nullable?: boolean;
+  /** Id of a <datalist> with suggestions. */
+  listId?: string;
 }
 
 export function FormFieldText<T extends FieldValues, N extends FieldPath<T>>({
@@ -28,6 +30,7 @@ export function FormFieldText<T extends FieldValues, N extends FieldPath<T>>({
   inputMode,
   maxLength,
   nullable,
+  listId,
 }: FormFieldTextProps<T, N>) {
   return (
     <FormField
@@ -46,6 +49,7 @@ export function FormFieldText<T extends FieldValues, N extends FieldPath<T>>({
               autoComplete={autoComplete}
               inputMode={inputMode}
               maxLength={maxLength}
+              list={listId}
               disabled={disabled}
             />
           </FormControl>

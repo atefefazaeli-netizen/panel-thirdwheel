@@ -1,7 +1,7 @@
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { FileJsonIcon, SendIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { DataTable, PageHeader, RoleGate, type FacetedFilterConfig } from '@/components/shared';
+import { Can, DataTable, PageHeader, type FacetedFilterConfig } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { errorMessage } from '@/lib/api';
@@ -100,9 +100,9 @@ export function ContentListPage() {
     <>
       <PageHeader
         title="Content"
-        description="Release 1 quizzes, games and Do cards. Every change is a draft until a clinician approves it. Seeded content is not a clinician sign-off: filter Clinical review to see what still needs one."
+        description="Release 1 quizzes, games and Do cards. Every change is a draft until a content reviewer approves it. Seeded content is not a clinician sign-off: filter Clinical review to see what still needs one."
         actions={
-          <RoleGate allow="admin">
+          <Can perm="content.edit">
             <Button variant="outline" asChild>
               <Link to="/content/import">
                 <FileJsonIcon />
@@ -110,7 +110,7 @@ export function ContentListPage() {
               </Link>
             </Button>
             <NewItemDialog defaultPillar={search.pillar ?? 'quiz'} />
-          </RoleGate>
+          </Can>
         }
       />
       <Tabs
@@ -145,12 +145,12 @@ export function ContentListPage() {
         initialColumnVisibility={{ type: false, updatedAt: false }}
         selectable
         batchActions={({ rows, clear }) => (
-          <RoleGate allow="admin">
+          <Can perm="content.submit">
             <Button size="sm" variant="outline" className="h-8" onClick={() => void submitMany(rows, clear)}>
               <SendIcon />
               Submit drafts for review
             </Button>
-          </RoleGate>
+          </Can>
         )}
         toolbar={{
           search: {

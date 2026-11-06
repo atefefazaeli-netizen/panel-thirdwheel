@@ -9,6 +9,7 @@ import { createItem } from '@/mocks/content-domain';
 import { db } from '@/mocks/db';
 import { server } from '@/mocks/node';
 import { p } from '@/mocks/utils';
+import { staffId } from '@/mocks/data/staff';
 import { renderRoute } from '@/test/utils';
 
 const bar = () => screen.findByRole('region', { name: 'Workflow' });
@@ -20,7 +21,7 @@ const bumpRev = (id: string, patch: Record<string, unknown> = {}) => {
 
 describe('content audit (mock API)', () => {
   it('shows Needs clinical review with the reasons, and the seed is not a sign-off', async () => {
-    renderRoute('/content/blind-taste-test', { roles: ['admin'] });
+    renderRoute('/content/blind-taste-test', { roles: ['content_editor', 'content_reviewer'] });
     await bar();
     expect(screen.getAllByText('Needs clinical review').length).toBeGreaterThan(0);
     const parts = screen.getByRole('list', { name: 'Parts that need clinical review' });
@@ -29,15 +30,17 @@ describe('content audit (mock API)', () => {
   });
 
   it('history labels seeded versions as not a sign-off', async () => {
-    renderRoute('/content/blind-taste-test?tab=history', { roles: ['admin'] });
+    renderRoute('/content/blind-taste-test?tab=history', { roles: ['content_editor', 'content_reviewer'] });
     const versions = await screen.findByRole('table', { name: 'Versions' });
-    expect(within(versions).getByText('Seeded from the Release 1 bundle, not a sign-off in this system')).toBeInTheDocument();
+    expect(
+      within(versions).getByText('Seeded from the Release 1 bundle, not a sign-off in this system'),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Workbook (clinician-cleared)')).not.toBeInTheDocument();
   });
 
   it('a save after someone else saved shows the conflict, keeps the edits and offers the JSON', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/blind-taste-test', { roles: ['admin'] });
+    renderRoute('/content/blind-taste-test', { roles: ['content_editor', 'content_reviewer'] });
     const b = await bar();
     const title = screen.getByRole('textbox', { name: 'Title' });
     await user.clear(title);
@@ -50,13 +53,15 @@ describe('content audit (mock API)', () => {
     expect(within(banner).getByRole('button', { name: /Copy my edits/ })).toBeInTheDocument();
     expect(within(b).getByRole('button', { name: 'Save draft' })).toBeDisabled();
     await user.click(within(banner).getByRole('button', { name: /Load the latest/ }));
-    await waitFor(() => expect(screen.queryByRole('alert', { name: 'Changed by someone else' })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('alert', { name: 'Changed by someone else' })).not.toBeInTheDocument(),
+    );
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Blind taste test');
   });
 
   it('approve carries the revision the clinician saw: a draft changed meanwhile is not approved', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/my-perfect-day', { roles: ['clinician'] });
+    renderRoute('/content/my-perfect-day', { roles: ['content_reviewer'] });
     const b = await bar();
     bumpRev('my-perfect-day');
     await user.click(within(b).getByRole('button', { name: 'Approve and publish' }));
@@ -69,15 +74,22 @@ describe('content audit (mock API)', () => {
   it('warns before a clinician approves a draft they last edited, and the log records it', async () => {
     const user = userEvent.setup();
     const i = db().content.items.get('my-perfect-day')!;
-    db().content.items.set(i.id, { ...i, draft: { ...i.draft!, by: 'stf_test' } });
-    renderRoute('/content/my-perfect-day', { roles: ['admin', 'clinician'] });
+    db().content.items.set(i.id, {
+      ...i,
+      draft: { ...i.draft!, by: `staff:${staffId('test.content_editor.content_reviewer')}` },
+    });
+    renderRoute('/content/my-perfect-day', { roles: ['content_editor', 'content_reviewer'] });
     const b = await bar();
     await user.click(within(b).getByRole('button', { name: 'Approve and publish' }));
     const dialog = await screen.findByRole('dialog', { name: 'Approve and publish' });
     expect(within(dialog).getByText('You last edited this draft')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Approve and publish' }));
     await waitFor(() => expect(db().content.items.get('my-perfect-day')!.liveVersion).toBe(3));
-    expect(db().content.changes.filter((c) => c.itemId === 'my-perfect-day').at(-1)).toMatchObject({ action: 'approved', meta: { selfApproved: true } });
+    expect(
+      db()
+        .content.changes.filter((c) => c.itemId === 'my-perfect-day')
+        .at(-1),
+    ).toMatchObject({ action: 'approved', meta: { selfApproved: true } });
   });
 
   it('held content: red banner, and approve needs the acknowledgement', async () => {
@@ -87,26 +99,35 @@ describe('content audit (mock API)', () => {
         id: 'repair-walk',
         pillar: 'do',
         kind: 'do-home',
-        snapshot: { catalog: { title: 'Repair walk, 20 minutes', where: ['outside'], category: 'outdoors', minutes: 20 }, body: { steps: [{ title: 'Walk', body: 'Side by side.' }] } },
+        snapshot: {
+          catalog: { title: 'Repair walk, 20 minutes', where: ['outside'], category: 'outdoors', minutes: 20 },
+          body: { steps: [{ title: 'Walk', body: 'Side by side.' }] },
+        },
       },
-      { id: 'apikey:n8n', email: null, roles: [] },
+      { id: 'apikey:n8n', email: null, permissions: [] },
       new Date().toISOString(),
       'n8n',
       'in_review',
     );
     db().content.items.set(t.item.id, t.item);
-    renderRoute('/content/repair-walk', { roles: ['clinician'] });
+    renderRoute('/content/repair-walk', { roles: ['content_reviewer'] });
     const b = await bar();
     expect(screen.getAllByText('Matches content held back from Release 1').length).toBeGreaterThan(0);
     await user.click(within(b).getByRole('button', { name: 'Approve and publish' }));
     const dialog = await screen.findByRole('dialog', { name: 'Approve and publish' });
     await user.click(within(dialog).getByRole('button', { name: 'Approve and publish' }));
-    expect(await within(dialog).findByText('Confirm you checked the held content before approving.')).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText('Confirm you checked the held content before approving.'),
+    ).toBeInTheDocument();
     expect(db().content.items.get('repair-walk')!.liveVersion).toBe(0);
     await user.click(within(dialog).getByRole('checkbox', { name: /I checked this against the held list/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Approve and publish' }));
     await waitFor(() => expect(db().content.items.get('repair-walk')!.liveVersion).toBe(1));
-    expect(db().content.changes.filter((c) => c.itemId === 'repair-walk').at(-1)).toMatchObject({ meta: { acknowledgedHeld: true } });
+    expect(
+      db()
+        .content.changes.filter((c) => c.itemId === 'repair-walk')
+        .at(-1),
+    ).toMatchObject({ meta: { acknowledgedHeld: true } });
   });
 
   it('maps the server field errors onto the fields', async () => {
@@ -114,12 +135,17 @@ describe('content audit (mock API)', () => {
     server.use(
       http.put(p('admin/content/:id/draft'), () =>
         HttpResponse.json(
-          { statusCode: 400, message: 'This content is not valid.', code: 'INVALID_CONTENT', details: ['catalog.title: not allowed by the server'] },
+          {
+            statusCode: 400,
+            message: 'This content is not valid.',
+            code: 'INVALID_CONTENT',
+            details: ['catalog.title: not allowed by the server'],
+          },
           { status: 400 },
         ),
       ),
     );
-    renderRoute('/content/blind-taste-test', { roles: ['admin'] });
+    renderRoute('/content/blind-taste-test', { roles: ['content_editor', 'content_reviewer'] });
     const b = await bar();
     const title = screen.getByRole('textbox', { name: 'Title' });
     await user.type(title, '!');
@@ -129,7 +155,7 @@ describe('content audit (mock API)', () => {
   });
 
   it('the list filters by clinical review and marks the rows', async () => {
-    renderRoute('/content?needsReview=true&pillar=do&limit=50', { roles: ['admin'] });
+    renderRoute('/content?needsReview=true&pillar=do&limit=50', { roles: ['content_editor', 'content_reviewer'] });
     expect(await screen.findByText('Blind taste test')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Content items' });
     const rows = within(table)
@@ -141,11 +167,28 @@ describe('content audit (mock API)', () => {
 
   it('import: duplicates in the file, a server check against existing ids, per-item results', async () => {
     const user = userEvent.setup();
-    renderRoute('/content/import', { roles: ['admin'] });
+    renderRoute('/content/import', { roles: ['content_editor', 'content_reviewer'] });
     const editor = await screen.findByRole('textbox', { name: 'Items' });
-    const item = (id: string, title: string) => ({ id, pillar: 'quiz', kind: 'quiz-turn', catalog: { title }, body: { cards: [{ text: 'Q?' }] } });
+    const item = (id: string, title: string) => ({
+      id,
+      pillar: 'quiz',
+      kind: 'quiz-turn',
+      catalog: { title },
+      body: { cards: [{ text: 'Q?' }] },
+    });
     await user.click(editor);
-    await user.paste(JSON.stringify([item('brand-new', 'Brand new'), item('brand-new', 'Twice'), { ...item('blind-taste-test', 'x'), pillar: 'do', kind: 'do-home', body: { steps: [{ title: 'a', body: 'b' }] } }]));
+    await user.paste(
+      JSON.stringify([
+        item('brand-new', 'Brand new'),
+        item('brand-new', 'Twice'),
+        {
+          ...item('blind-taste-test', 'x'),
+          pillar: 'do',
+          kind: 'do-home',
+          body: { steps: [{ title: 'a', body: 'b' }] },
+        },
+      ]),
+    );
     const table = await screen.findByRole('table', { name: 'Import preview' });
     expect(within(table).getByText('Listed twice in this import')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Check against the server' }));
@@ -160,7 +203,7 @@ describe('content audit (mock API)', () => {
 
   it('review queue: approve carries the revision on screen; a change meanwhile shows the conflict', async () => {
     const user = userEvent.setup();
-    renderRoute('/review?id=my-perfect-day', { roles: ['clinician'] });
+    renderRoute('/review?id=my-perfect-day', { roles: ['content_reviewer'] });
     const approve = await screen.findByRole('button', { name: 'Approve and publish' });
     bumpRev('my-perfect-day');
     await user.click(approve);

@@ -5,9 +5,9 @@ import {
   CopyButton,
   EmptyState,
   ErrorState,
-  ForbiddenState,
+  Can,
   PageHeader,
-  RoleGate,
+  RequirePermission,
   StatusBadge,
 } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -37,9 +37,9 @@ function Fields({ rows }: { rows: [string, React.ReactNode][] }) {
 
 export function UserDetailPage() {
   return (
-    <RoleGate allow="admin" fallback={<ForbiddenState what="users" />}>
+    <RequirePermission perm="users.read" what="users">
       <UserDetail />
-    </RoleGate>
+    </RequirePermission>
   );
 }
 
@@ -58,7 +58,6 @@ function UserDetail() {
     );
   const { account, profile, couple, subscription, safety, support } = q.data;
   const down = new Set(q.data.unavailable ?? []);
-  const staff = account.roles.filter((r) => r === 'admin' || r === 'clinician');
 
   return (
     <>
@@ -70,11 +69,6 @@ function UserDetail() {
               <StatusBadge status={subscription.state} label={PLAN_LABEL[subscription.state]} dot={false} />
             )}
             {account.suspended && <StatusBadge status="suspended" />}
-            {staff.map((r) => (
-              <Badge key={r} variant="outline" className="capitalize">
-                {r}
-              </Badge>
-            ))}
           </>
         }
         description={account.email}
@@ -126,7 +120,7 @@ function UserDetail() {
           <CardHeader>
             <CardTitle>Subscription</CardTitle>
             <CardDescription>
-              Store purchases are managed in the stores. Admins can grant Plus for a set time.
+              Store purchases are managed in the stores. Staff with the Plus permission can grant Plus for a set time.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -251,62 +245,67 @@ function UserDetail() {
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldAlertIcon className="size-4" aria-hidden />
-                Safety
-              </CardTitle>
-              <CardDescription>Metadata only. Thirdwheel never stores what was typed.</CardDescription>
-              <CardAction>
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/safety" search={{ userId: account.userId }}>
-                    View flags
-                  </Link>
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              {safety ? (
-                <Fields
-                  rows={[
-                    ['Open flags', String(safety.open)],
-                    ['All flags', String(safety.total)],
-                    ['Last flag', safety.lastAt ? formatRelative(safety.lastAt) : 'Never'],
-                  ]}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">Not available: the safety service did not answer.</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LifeBuoyIcon className="size-4" aria-hidden />
-                Support
-              </CardTitle>
-              <CardAction>
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/support" search={{ status: 'all' }}>
-                    Open inbox
-                  </Link>
-                </Button>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              {support ? (
-                <Fields
-                  rows={[
-                    ['Open tickets', String(support.open)],
-                    ['All tickets', String(support.total)],
-                  ]}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">Not available: the support service did not answer.</p>
-              )}
-            </CardContent>
-          </Card>
+          {/* The API sends the safety part only with safety.read and the support part only with support.read. */}
+          <Can perm="safety.read">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldAlertIcon className="size-4" aria-hidden />
+                  Safety
+                </CardTitle>
+                <CardDescription>Metadata only. Thirdwheel never stores what was typed.</CardDescription>
+                <CardAction>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/safety" search={{ userId: account.userId }}>
+                      View flags
+                    </Link>
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                {safety ? (
+                  <Fields
+                    rows={[
+                      ['Open flags', String(safety.open)],
+                      ['All flags', String(safety.total)],
+                      ['Last flag', safety.lastAt ? formatRelative(safety.lastAt) : 'Never'],
+                    ]}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Not available: the safety service did not answer.</p>
+                )}
+              </CardContent>
+            </Card>
+          </Can>
+          <Can perm="support.read">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LifeBuoyIcon className="size-4" aria-hidden />
+                  Support
+                </CardTitle>
+                <CardAction>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/support" search={{ status: 'all', userId: account.userId }}>
+                      Open inbox
+                    </Link>
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                {support ? (
+                  <Fields
+                    rows={[
+                      ['Open tickets', String(support.open)],
+                      ['All tickets', String(support.total)],
+                    ]}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Not available: the support service did not answer.</p>
+                )}
+              </CardContent>
+            </Card>
+          </Can>
         </div>
       </div>
     </>

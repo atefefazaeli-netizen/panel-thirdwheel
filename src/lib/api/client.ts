@@ -1,13 +1,17 @@
-// Typed fetch wrapper for the Thirdwheel API.
+// Typed fetch wrapper for the Thirdwheel API (STAFF_API.md §1, §2).
 // - Base URL from VITE_API_URL (default `/api/v1`, proxied by the Vite dev server).
-// - Bearer access token from memory. A 401 triggers one refresh (single flight: concurrent
-//   callers share it) and one retry. A refused refresh ends the session.
-// - Mutating calls (POST, PUT, PATCH, DELETE) send an `Idempotency-Key` so a retried request is
-//   never applied twice by the server.
-// - Failures throw ApiError with the server's `code`, `requestId` and `retryAt`.
+// - The staff session is an HttpOnly cookie (`tw_staff_sid`): every call sends
+//   `credentials: 'include'` and the panel never sees or stores a token.
+// - Writes (POST, PUT, PATCH, DELETE) send `X-CSRF-Token` (kept in memory, csrf.ts) and an
+//   `Idempotency-Key`, so a retried request is never applied twice.
+// - A 401 runs one session re-check for all callers (single flight). No session left: the session
+//   ends and the app goes to sign-in. A 403 CSRF_FAILED re-reads the session (new token) and retries
+//   once. A 403 for a missing permission tells listeners, so the session's permissions are re-read.
+// - Failures throw ApiError with the server's `code`, `requestId`, `retryAt` and `details`.
 import { env } from '@/config/env';
-import { ApiError, type ApiErrorBody } from './errors';
-import { clearTokens, getAccessToken, getRefreshToken, peekAccessToken, setTokens, type TokenPair } from './tokens';
+import type { Restriction, StaffMe } from '@/stores/session';
+import { clearCsrfToken, getCsrfToken, setCsrfToken } from './csrf';
+import { ApiError, isPermissionRefusalCode, type ApiErrorBody } from './errors';
 import type { Query } from './types';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -15,7 +19,10 @@ export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export interface RequestOptions {
   query?: Query;
   body?: unknown;
-  /** Send the bearer token (default true). Sign-in routes pass false. */
+  /**
+   * The call needs a staff session (default true): a 401 then re-checks the session and ends it
+   * when none is left. Sign-in routes pass false (a 401 there is a wrong password).
+   */
   auth?: boolean;
   /** Override the generated Idempotency-Key, or `false` to send none. */
   idempotencyKey?: string | false;
@@ -26,42 +33,60 @@ export interface RequestOptions {
   timeoutMs?: number;
 }
 
+/** `GET staff/auth/session` (STAFF_API.md §2). */
+export interface SessionInfo {
+  staff: StaffMe;
+  csrfToken: string;
+  restricted: Restriction | null;
+}
+
 const DEFAULT_TIMEOUT_MS = 20_000;
 const MUTATING: ReadonlySet<Method> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+export const SESSION_PATH = 'staff/auth/session';
 
-type SessionEndReason = 'refresh_failed' | 'suspended' | 'signed_out';
+export type SessionEndReason = 'expired' | 'signed_out';
 const sessionEndListeners = new Set<(reason: SessionEndReason) => void>();
-const roleRefusedListeners = new Set<() => void>();
+const sessionListeners = new Set<(info: SessionInfo) => void>();
+const permissionRefusedListeners = new Set<() => void>();
 
-/**
- * Called when the API refuses a call for the role (403 INSUFFICIENT_ROLE). Roles follow
- * ADMIN_EMAILS / CLINICIAN_EMAILS on every request, so the roles the panel loaded at sign-in may
- * be out of date: the session re-reads admin/me and the role gates follow.
- */
-export function onRoleRefused(fn: () => void): () => void {
-  roleRefusedListeners.add(fn);
-  return () => {
-    roleRefusedListeners.delete(fn);
-  };
-}
-
-/** Called when the session ends (refresh refused, account suspended, sign out). */
-export function onSessionEnd(fn: (reason: SessionEndReason) => void): () => void {
-  sessionEndListeners.add(fn);
-  return () => {
-    sessionEndListeners.delete(fn);
-  };
-}
-
-export function endSession(reason: SessionEndReason): void {
-  clearTokens();
-  sessionEndListeners.forEach((fn) => {
+function notify<A extends unknown[]>(set: Set<(...a: A) => void>, ...args: A): void {
+  set.forEach((fn) => {
     try {
-      fn(reason);
+      fn(...args);
     } catch {
       // A listener must not stop the others.
     }
   });
+}
+
+/** Called with every session the API answers (sign-in, reload, re-check). */
+export function onSession(fn: (info: SessionInfo) => void): () => void {
+  sessionListeners.add(fn);
+  return () => void sessionListeners.delete(fn);
+}
+
+/** Called when the API refuses a call for a missing permission (or a restricted session). */
+export function onPermissionRefused(fn: () => void): () => void {
+  permissionRefusedListeners.add(fn);
+  return () => void permissionRefusedListeners.delete(fn);
+}
+
+/** Called when the session ends (expired, revoked, signed out). */
+export function onSessionEnd(fn: (reason: SessionEndReason) => void): () => void {
+  sessionEndListeners.add(fn);
+  return () => void sessionEndListeners.delete(fn);
+}
+
+export function endSession(reason: SessionEndReason): void {
+  clearCsrfToken();
+  notify(sessionEndListeners, reason);
+}
+
+/** Records a session answer: keeps the CSRF token in memory and tells listeners. */
+export function acceptSession(info: SessionInfo): SessionInfo {
+  setCsrfToken(info.csrfToken);
+  notify(sessionListeners, info);
+  return info;
 }
 
 export function newIdempotencyKey(): string {
@@ -93,13 +118,7 @@ interface RawResult {
   retryAfter?: number | null;
 }
 
-async function send(
-  method: Method,
-  path: string,
-  opts: RequestOptions,
-  token: string | null,
-  idemKey: string | null,
-): Promise<RawResult> {
+async function send(method: Method, path: string, opts: RequestOptions, idemKey: string | null): Promise<RawResult> {
   const requestId = newRequestId();
   const headers: Record<string, string> = { Accept: 'application/json', 'x-request-id': requestId, ...opts.headers };
   let body: string | undefined;
@@ -107,7 +126,10 @@ async function send(
     headers['Content-Type'] = 'application/json';
     body = JSON.stringify(opts.body);
   }
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (MUTATING.has(method)) {
+    const csrf = getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
   if (idemKey) headers['Idempotency-Key'] = idemKey;
 
   const ctrl = new AbortController();
@@ -122,7 +144,14 @@ async function send(
   try {
     let res: Response;
     try {
-      res = await fetch(apiUrl(path, opts.query), { method, headers, body, signal: ctrl.signal });
+      res = await fetch(apiUrl(path, opts.query), {
+        method,
+        headers,
+        body,
+        signal: ctrl.signal,
+        // The staff session cookie (HttpOnly, set by the API) goes with every call.
+        credentials: 'include',
+      });
     } catch (e) {
       if (opts.signal?.aborted) throw e;
       throw new ApiError(timedOut ? 'timeout' : 'network', {
@@ -168,34 +197,31 @@ function httpError(r: RawResult): ApiError {
   });
 }
 
-/* ---------- Refresh (single flight) ---------- */
+const codeOf = (r: RawResult) => (r.body as ApiErrorBody | undefined)?.code;
 
-let refreshing: Promise<boolean> | null = null;
+/* ---------- Session re-check (single flight) ---------- */
 
-/** Rotates the refresh token. Concurrent callers share one request. Resolves false when refused. */
-export function refreshSession(): Promise<boolean> {
-  if (!refreshing) {
-    refreshing = doRefresh().finally(() => {
-      refreshing = null;
-    });
-  }
-  return refreshing;
+let checking: Promise<SessionInfo | null> | null = null;
+
+/**
+ * Re-reads the session (`GET staff/auth/session`). Concurrent callers share one request. Resolves
+ * the session, or null when there is none (the session then ends). A busy or unreachable API
+ * throws and keeps the session as it is.
+ */
+export function recheckSession(): Promise<SessionInfo | null> {
+  checking ??= doRecheck().finally(() => {
+    checking = null;
+  });
+  return checking;
 }
 
-async function doRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
-  const r = await send('POST', 'auth/refresh', { body: { refreshToken } }, null, null);
-  if (r.status >= 200 && r.status < 300) {
-    setTokens(r.body as TokenPair);
-    return true;
+async function doRecheck(): Promise<SessionInfo | null> {
+  const r = await send('GET', SESSION_PATH, {}, null);
+  if (r.status >= 200 && r.status < 300) return acceptSession(r.body as SessionInfo);
+  if (r.status === 401) {
+    endSession('expired');
+    return null;
   }
-  if (r.status >= 400 && r.status < 500 && r.status !== 429) {
-    const suspended = (r.body as ApiErrorBody | undefined)?.code === 'ACCOUNT_SUSPENDED';
-    endSession(suspended ? 'suspended' : 'refresh_failed');
-    return false;
-  }
-  // 429 or 5xx: keep the tokens; the caller treats the API as unavailable for now.
   throw httpError(r);
 }
 
@@ -206,44 +232,29 @@ export async function request<T>(method: Method, path: string, opts: RequestOpti
   const idemKey =
     MUTATING.has(method) && opts.idempotencyKey !== false ? opts.idempotencyKey || newIdempotencyKey() : null;
 
-  let token: string | null = null;
-  if (auth) {
-    token = getAccessToken();
-    if (!token) {
-      // No valid access token in memory (expired, or a reload): try the refresh token first.
-      if (!(await refreshSession())) throw new ApiError('unauthorized', { status: 401 });
-      token = getAccessToken();
-    }
-  }
-
-  let r = await send(method, path, opts, token, idemKey);
+  let r = await send(method, path, opts, idemKey);
 
   if (auth && r.status === 401) {
-    // Another call may have refreshed while this one was in flight: reuse its token.
-    const current = peekAccessToken();
-    const fresh = current && current !== token ? true : await refreshSession();
-    if (!fresh) throw new ApiError('unauthorized', { status: 401, body: r.body as ApiErrorBody });
+    // The cookie expired or was revoked, or another tab signed out: ask the API once for all callers.
+    const info = await recheckSession().catch(() => null);
+    if (!info)
+      throw new ApiError('unauthorized', { status: 401, body: r.body as ApiErrorBody, requestId: r.requestId });
     // Same Idempotency-Key: the server never applies the retried write twice.
-    r = await send(method, path, opts, getAccessToken() ?? peekAccessToken(), idemKey);
+    r = await send(method, path, opts, idemKey);
     if (r.status === 401) {
-      endSession('refresh_failed');
+      endSession('expired');
       throw new ApiError('unauthorized', { status: 401, body: r.body as ApiErrorBody, requestId: r.requestId });
     }
   }
 
-  const code403 = r.status === 403 ? (r.body as ApiErrorBody | undefined)?.code : undefined;
-  if (auth && code403 === 'ACCOUNT_SUSPENDED') {
-    endSession('suspended');
+  if (auth && r.status === 403 && codeOf(r) === 'CSRF_FAILED' && MUTATING.has(method)) {
+    // The token in memory is stale (a new session, or one rotated by a password change): fetch the
+    // session again for a fresh token and retry once.
+    const info = await recheckSession().catch(() => null);
+    if (info) r = await send(method, path, opts, idemKey);
   }
-  if (auth && code403 === 'INSUFFICIENT_ROLE') {
-    roleRefusedListeners.forEach((fn) => {
-      try {
-        fn();
-      } catch {
-        // A listener must not stop the others.
-      }
-    });
-  }
+
+  if (auth && r.status === 403 && isPermissionRefusalCode(codeOf(r))) notify(permissionRefusedListeners);
   if (r.status < 200 || r.status >= 300) throw httpError(r);
   return r.body as T;
 }
@@ -258,7 +269,8 @@ export const api = {
     request<Blob>('GET', path, { ...opts, responseType: 'blob' }),
 };
 
-/** For tests: forget an in-flight refresh. */
+/** For tests: forget an in-flight session re-check and the CSRF token. */
 export function __resetClientForTests(): void {
-  refreshing = null;
+  checking = null;
+  clearCsrfToken();
 }
