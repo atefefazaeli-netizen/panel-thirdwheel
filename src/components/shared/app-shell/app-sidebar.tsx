@@ -100,7 +100,7 @@ export function AppSidebar({ staff, badges = {} }: { staff: StaffMe | null; badg
         })}
       </SidebarContent>
       <SidebarFooter className="px-4 pb-3 text-xs text-sidebar-muted group-data-[collapsible=icon]:hidden">
-        Release 1 content · panel v0.1
+        Release 1 content · panel v{__PANEL_VERSION__}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
