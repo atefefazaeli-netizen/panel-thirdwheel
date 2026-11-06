@@ -39,7 +39,6 @@ import { configDiff } from '../lib/diff';
 import {
   configFormSchema,
   fromForm,
-  MAINTENANCE_MAX,
   publishSchema,
   toForm,
   type ConfigFormValues,
@@ -48,14 +47,21 @@ import {
 
 const route = getRouteApi('/_app/app-config');
 
+/** Who published a version: the staff name, System for the migration's default, or the admin email a v2.0.0 version recorded. */
+function publisher(v: ConfigVersion): string {
+  if (v.publishedByName) return v.publishedByName;
+  if (v.publishedBy === 'system') return 'System';
+  return v.publishedBy.startsWith('user:') ? 'Admin (before staff accounts)' : v.publishedBy;
+}
+
 /** What the app gets now: the published config, or every server feature on before any publish. */
 function liveConfig(view: AppConfigAdmin): AppConfigBody {
   return (
     view.published?.config ?? {
       features: Object.fromEntries(view.features.map((f) => [f.key, true])),
       maintenance: { enabled: false, message: null },
-      minVersion: null,
-      recommendedVersion: null,
+      minAppVersion: null,
+      recommendedAppVersion: null,
     }
   );
 }
@@ -211,16 +217,16 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
                     name="maintenanceMessage"
                     label="Maintenance message"
                     rows={3}
-                    maxLength={MAINTENANCE_MAX}
+                    maxLength={data.limits.maintenanceMessageMax}
                     disabled={!canEdit}
-                    description={`What people see on the maintenance screen, at most ${MAINTENANCE_MAX} characters.`}
+                    description={`What people see on the maintenance screen, at most ${data.limits.maintenanceMessageMax} characters. Kept while maintenance is off; the app only gets it once maintenance is on and published.`}
                   />
                 </fieldset>
                 <fieldset className="grid gap-3 sm:grid-cols-2" disabled={!canEdit}>
                   <legend className="mb-2 text-sm font-semibold">Versions</legend>
                   <FormFieldText
                     control={form.control}
-                    name="minVersion"
+                    name="minAppVersion"
                     label="Minimum version"
                     placeholder="No limit"
                     description="Below it the app asks for an update before it opens."
@@ -228,7 +234,7 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
                   />
                   <FormFieldText
                     control={form.control}
-                    name="recommendedVersion"
+                    name="recommendedAppVersion"
                     label="Recommended version"
                     placeholder="No limit"
                     description="Below it the app suggests an update."
@@ -316,7 +322,13 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
                 </li>
               ))}
             </ul>
-            <FormFieldTextarea control={f.control} name="note" label="Note (optional)" rows={2} maxLength={300} />
+            <FormFieldTextarea
+              control={f.control}
+              name="note"
+              label="Note (optional)"
+              rows={2}
+              maxLength={data.limits.noteMax}
+            />
           </>
         )}
       </FormDialog>
@@ -368,12 +380,14 @@ function HistoryCard({ current }: { current: AppConfigAdmin | undefined }) {
                       v{v.version} {v.version === live && <StatusBadge status="live" label="Live" />}
                     </TableCell>
                     <TableCell>{formatDateTime(v.publishedAt)}</TableCell>
-                    <TableCell>
-                      {v.publishedByName ?? (v.publishedBy === 'system' ? 'System' : v.publishedBy)}
-                    </TableCell>
+                    <TableCell>{publisher(v)}</TableCell>
                     <TableCell className="max-w-72 truncate text-muted-foreground">
                       {v.kind === 'seed' ? 'Default config. ' : ''}
-                      {v.rolledBackFrom ? `Rollback to v${v.rolledBackFrom}. ` : ''}
+                      {v.rolledBackFrom === 0
+                        ? 'Rollback to the defaults. '
+                        : v.rolledBackFrom
+                          ? `Rollback to v${v.rolledBackFrom}. `
+                          : ''}
                       {v.note ?? ''}
                     </TableCell>
                     <TableCell className="text-right">
