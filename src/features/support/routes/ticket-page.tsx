@@ -60,7 +60,9 @@ const route = getRouteApi('/_app/support/$id');
 
 export function TicketPage() {
   const { id } = route.useParams();
-  const ticket = useTicket(id);
+  // Poll queued replies only when a provider can actually send them.
+  const canSend = useDeliveryStatus().data?.canSend === true;
+  const ticket = useTicket(id, canSend);
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="self-start">
@@ -185,8 +187,8 @@ function TicketControls({ ticket }: { ticket: SupportTicketDetail }) {
   };
 
   const assigneeOptions: Assignee[] = [...(people ?? [])];
-  if (ticket.assigneeId && !assigneeOptions.some((p) => p.id === ticket.assigneeId))
-    assigneeOptions.push({ id: ticket.assigneeId, displayName: assigneeName(ticket, people) ?? 'Someone' });
+  if (ticket.assignee && !assigneeOptions.some((p) => p.id === ticket.assignee))
+    assigneeOptions.push({ id: ticket.assignee, displayName: assigneeName(ticket, people) ?? 'Someone' });
 
   return (
     <Card className="h-fit">
@@ -240,7 +242,7 @@ function TicketControls({ ticket }: { ticket: SupportTicketDetail }) {
         >
           <NativeSelect
             id="ticket-assignee"
-            value={ticket.assigneeId ?? ''}
+            value={ticket.assignee ?? ''}
             disabled={change.isPending || !people}
             onChange={(e) =>
               void run({ kind: 'assignee', value: e.target.value || null }, e.target.value ? 'Assigned' : 'Unassigned')
@@ -292,8 +294,10 @@ function Field({
 
 /* ---------- Timeline ---------- */
 
+/** `actorName` is the staff member's name at the time; `actor: 'user'` is the person who wrote in. */
 function who(e: TimelineEvent) {
-  return e.byName ?? (e.by ? 'A staff member' : 'The user');
+  if (e.actor === 'user') return 'The user';
+  return e.actorName ?? 'A staff member';
 }
 
 function Timeline({ ticket }: { ticket: SupportTicketDetail }) {

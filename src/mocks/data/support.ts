@@ -13,7 +13,8 @@ export interface SupportState {
   tickets: StoredTicket[];
   /**
    * The server's email provider for replies. `none` = EMAIL_DRIVER=log (today's only driver): replies
-   * stay pending with NO_EMAIL_PROVIDER. Tests switch it to `mock-smtp` (accepts) or `failing`.
+   * stay pending with NO_EMAIL_PROVIDER. Tests switch it to `mock-smtp` (accepts) or `failing`
+   * (refuses: failed with SEND_FAILED).
    */
   provider: 'none' | 'mock-smtp' | 'failing';
 }
@@ -87,7 +88,9 @@ export function seedSupport(): SupportState {
     tickets: rows.map(([name, kind, topic, text, device, status, days, shot], i): StoredTicket => {
       const id = oid(`ticket:${i}`);
       const createdAt = daysAgo(days);
-      const timeline: TimelineEvent[] = [{ id: oid(`ev:${i}:0`), type: 'created', at: createdAt, by: null }];
+      const timeline: TimelineEvent[] = [
+        { id: oid(`ev:${i}:0`), type: 'created', at: createdAt, actor: 'user', actorName: null },
+      ];
       // A few tickets already worked on: assigned, prioritised, a note and a pending reply.
       const assigneeId = i === 1 ? support : i === 3 ? lead : i === 5 ? support : null;
       const priority = i === 3 ? 'urgent' : i === 1 ? 'high' : i === 8 ? 'low' : 'normal';
@@ -98,10 +101,11 @@ export function seedSupport(): SupportState {
           id: oid(`ev:${i}:1`),
           type: 'assignee',
           at: daysAgo(days * 0.8),
-          by: `staff:${lead}`,
-          byName: 'Mira Nasser',
+          actor: `staff:${lead}`,
+          actorName: 'Mira Nasser',
           from: null,
           to: assigneeId,
+          fromName: null,
           toName: assigneeId === support ? 'Yousef Ali' : 'Mira Nasser',
         });
       if (priority !== 'normal')
@@ -109,8 +113,8 @@ export function seedSupport(): SupportState {
           id: oid(`ev:${i}:2`),
           type: 'priority',
           at: daysAgo(days * 0.7),
-          by: `staff:${lead}`,
-          byName: 'Mira Nasser',
+          actor: `staff:${lead}`,
+          actorName: 'Mira Nasser',
           from: 'normal',
           to: priority,
         });
@@ -119,8 +123,8 @@ export function seedSupport(): SupportState {
           id: oid(`ev:${i}:3`),
           type: 'note',
           at: daysAgo(days * 0.6),
-          by: `staff:${support}`,
-          byName: 'Yousef Ali',
+          actor: `staff:${support}`,
+          actorName: 'Yousef Ali',
           text:
             i === 1
               ? 'Checked the plan: Sara is on Plus, Alex should inherit it. Looks like a cache issue.'
@@ -130,13 +134,13 @@ export function seedSupport(): SupportState {
           id: oid(`ev:${i}:4`),
           type: 'reply',
           at: daysAgo(days * 0.5),
-          by: `staff:${support}`,
-          byName: 'Yousef Ali',
+          actor: `staff:${support}`,
+          actorName: 'Yousef Ali',
           text:
             i === 1
               ? 'Thanks for writing. Could you sign out and in again? That refreshes the plan on your phone.'
               : 'Sorry about that. We are checking with the venue and will get back to you.',
-          delivery: { status: 'pending', provider: null, attempts: 1, lastError: 'NO_EMAIL_PROVIDER', sentAt: null },
+          delivery: { status: 'pending', provider: null, attempts: 0, lastError: 'NO_EMAIL_PROVIDER', sentAt: null },
         });
       }
       if (st !== 'open')
@@ -144,8 +148,8 @@ export function seedSupport(): SupportState {
           id: oid(`ev:${i}:5`),
           type: 'status',
           at: daysAgo(days * 0.4),
-          by: `staff:${support}`,
-          byName: 'Yousef Ali',
+          actor: `staff:${support}`,
+          actorName: 'Yousef Ali',
           from: 'open',
           to: st,
         });
@@ -162,8 +166,10 @@ export function seedSupport(): SupportState {
         hasScreenshot: shot,
         status: st,
         priority,
-        assigneeId,
-        version: timeline.length,
+        assignee: assigneeId,
+        assigneeName: assigneeId ? (assigneeId === support ? 'Yousef Ali' : 'Mira Nasser') : null,
+        // Status, assignee and priority changes bump it (notes and replies do not).
+        version: timeline.filter((e) => e.type === 'status' || e.type === 'assignee' || e.type === 'priority').length,
         createdAt,
         updatedAt: timeline[timeline.length - 1]!.at,
         timeline,

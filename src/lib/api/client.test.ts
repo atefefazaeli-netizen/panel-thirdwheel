@@ -125,6 +125,14 @@ describe('error mapping', () => {
       'ROLE_IN_USE',
       'TICKET_CONFLICT',
       'CONFIG_CONFLICT',
+      'ASSIGNEE_NOT_ELIGIBLE',
+      'REPLY_NOT_FOUND',
+      'REPLY_ALREADY_SENT',
+      'TICKET_TIMELINE_FULL',
+      'INVALID_CONFIG',
+      'CONFIG_UNCHANGED',
+      'CONFIG_VERSION_NOT_FOUND',
+      'FEATURE_DISABLED',
     ]) {
       expect(copy(code), code).not.toBe('server text');
     }

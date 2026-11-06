@@ -21,12 +21,22 @@ export const DELIVERY_LABEL: Record<DeliveryStatus, string> = {
   failed: 'Failed',
 };
 
-/** Why a reply is not sent yet, in words. */
+/** Why a reply is not sent yet, in words. The API sends codes, never a provider's message. */
 export function deliveryProblem(lastError: string | null): string | null {
-  if (!lastError) return null;
-  if (lastError === 'NO_EMAIL_PROVIDER')
-    return 'No email provider is configured: this reply stays pending until one is set up.';
-  return lastError;
+  switch (lastError) {
+    case null:
+    case undefined:
+    case '':
+      return null;
+    case 'NO_EMAIL_PROVIDER':
+      return 'No email provider is configured: this reply stays pending until one is set up.';
+    case 'NO_RECIPIENT':
+      return 'The account has no email address, so the reply cannot be sent.';
+    case 'SEND_FAILED':
+      return 'The email provider did not accept the reply. The server tries again; you can also retry.';
+    default:
+      return 'The reply could not be sent.';
+  }
 }
 
 export const NO_PROVIDER_COPY =

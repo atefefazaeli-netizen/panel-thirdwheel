@@ -51,7 +51,7 @@ function useColumns(people: Assignee[] | undefined) {
       meta: { label: 'Status' },
       cell: (c) => <StatusBadge status={c.getValue()} label={STATUS_LABEL[c.getValue()]} />,
     }),
-    h.accessor('assigneeId', {
+    h.accessor('assignee', {
       header: 'Assignee',
       meta: { label: 'Assignee' },
       cell: (c) => assigneeName(c.row.original, people) ?? <span className="text-muted-foreground">Unassigned</span>,

@@ -100,15 +100,19 @@ const CODE_COPY: Record<string, string> = {
   ROLE_IN_USE: 'Someone still holds this role. Remove it from every account first.',
   ROLE_EXISTS: 'A role with this key exists already.',
   ROLE_NOT_FOUND: 'This role no longer exists.',
-  // Support workflow (§5) and Remote Config (§6).
+  // Support workflow (§5) and Remote Config (§6), as built on feature/support-remote-config.
   TICKET_CONFLICT:
     'Someone else changed this ticket since you opened it. The latest is loaded; check it and try again.',
+  TICKET_TIMELINE_FULL: 'This ticket has too much history. Close it and continue on a new ticket.',
+  ASSIGNEE_NOT_ELIGIBLE: 'That person cannot be assigned: only active staff who can read support tickets can.',
   REPLY_NOT_FOUND: 'This reply no longer exists.',
-  ASSIGNEE_INVALID: 'That person cannot be assigned: they need access to support tickets.',
+  REPLY_ALREADY_SENT: 'This reply was already sent.',
   CONFIG_CONFLICT:
     'Someone else changed Remote Config since you opened it. Load the latest, then make your change again.',
-  INVALID_CONFIG: 'The config did not pass validation.',
-  NOTHING_TO_PUBLISH: 'The draft is the same as the published config.',
+  INVALID_CONFIG: 'The config did not pass the server checks.',
+  CONFIG_UNCHANGED: 'This is already what the app gets: nothing changes.',
+  CONFIG_VERSION_NOT_FOUND: 'There is no published version with that number.',
+  FEATURE_DISABLED: 'This feature is switched off in Remote Config.',
   CONTENT_EXISTS: 'An item with this id already exists.',
   NOT_IN_REVIEW: 'This item is not in review any more.',
   INVALID_CONTENT: 'The content did not pass validation.',

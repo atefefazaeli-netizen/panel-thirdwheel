@@ -32,14 +32,15 @@ export const supportApi = {
   screenshot: (id: string) => api.blob(`${t(id)}/screenshot`),
   assignees: () => api.get<Assignee[]>('support/assignees'),
   deliveryStatus: () => api.get<DeliveryProviderStatus>('support/delivery-status'),
+  // Every write answers the ticket with its timeline (TicketDetailView).
   setStatus: (id: string, status: TicketStatus, expectedVersion: number) =>
-    api.put<SupportTicket>(`${t(id)}/status`, { status, expectedVersion }),
+    api.put<SupportTicketDetail>(`${t(id)}/status`, { status, expectedVersion }),
   setAssignee: (id: string, staffId: string | null, expectedVersion: number) =>
-    api.put<SupportTicket>(`${t(id)}/assignee`, { staffId, expectedVersion }),
+    api.put<SupportTicketDetail>(`${t(id)}/assignee`, { staffId, expectedVersion }),
   setPriority: (id: string, priority: TicketPriority, expectedVersion: number) =>
-    api.put<SupportTicket>(`${t(id)}/priority`, { priority, expectedVersion }),
-  addNote: (id: string, text: string) => api.post<unknown>(`${t(id)}/notes`, { text }),
-  reply: (id: string, text: string) => api.post<unknown>(`${t(id)}/replies`, { text }),
+    api.put<SupportTicketDetail>(`${t(id)}/priority`, { priority, expectedVersion }),
+  addNote: (id: string, text: string) => api.post<SupportTicketDetail>(`${t(id)}/notes`, { text }),
+  reply: (id: string, text: string) => api.post<SupportTicketDetail>(`${t(id)}/replies`, { text }),
   retryReply: (id: string, replyId: string) =>
-    api.post<unknown>(`${t(id)}/replies/${encodeURIComponent(replyId)}/retry`),
+    api.post<SupportTicketDetail>(`${t(id)}/replies/${encodeURIComponent(replyId)}/retry`),
 };

@@ -6,7 +6,7 @@ import { staffId } from '@/mocks/data/staff';
 import { db } from '@/mocks/db';
 import { server } from '@/mocks/node';
 import { oid, p } from '@/mocks/utils';
-import { renderRoute } from '@/test/utils';
+import { renderRoute, signInAs } from '@/test/utils';
 
 const ticketBy = (start: string) => db().support.tickets.find((t) => t.text.startsWith(start))!;
 const history = () => screen.findByRole('list', { name: 'Ticket history' });
@@ -29,14 +29,14 @@ describe('support inbox (mock API)', () => {
   it('filters by assignee (unassigned) and priority on the server', async () => {
     renderRoute('/support?status=all&assignee=unassigned&priority=low', { roles: ['support_agent'] });
     const table = await screen.findByRole('table', { name: 'Support tickets' });
-    const expected = db().support.tickets.filter((t) => !t.assigneeId && t.priority === 'low');
+    const expected = db().support.tickets.filter((t) => !t.assignee && t.priority === 'low');
     expect(expected.length).toBeGreaterThan(0);
     await waitFor(() => expect(within(table).getAllByRole('row').length).toBe(1 + expected.length));
   });
 
   it('assignee=me is resolved from the session', async () => {
     const mine = db().support.tickets[2]!;
-    mine.assigneeId = staffId('test.support_agent');
+    mine.assignee = staffId('test.support_agent');
     renderRoute('/support?status=all&assignee=me', { roles: ['support_agent'] });
     const table = await screen.findByRole('table', { name: 'Support tickets' });
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
@@ -136,7 +136,7 @@ describe('ticket workflow (mock API)', () => {
     await waitFor(() => expect(t.priority).toBe('urgent'));
     await waitFor(() => expect(screen.getByLabelText('Assignee')).not.toBeDisabled());
     await user.selectOptions(screen.getByLabelText('Assignee'), 'Mira Nasser');
-    await waitFor(() => expect(t.assigneeId).toBe(staffId('support.lead')));
+    await waitFor(() => expect(t.assignee).toBe(staffId('support.lead')));
     server.events.removeAllListeners();
     expect(bodies).toEqual([
       { status: 'in_progress', expectedVersion: v0 },
@@ -147,9 +147,9 @@ describe('ticket workflow (mock API)', () => {
     const actions = db()
       .audit.filter((a) => a.target === `support_ticket:${t.id}`)
       .map((a) => a.action);
-    expect(actions).toEqual(
-      expect.arrayContaining(['support.ticket_status', 'support.ticket_priority', 'support.ticket_assign']),
-    );
+    expect(actions).toEqual(expect.arrayContaining(['support.status', 'support.priority', 'support.assign']));
+    const status = db().audit.find((a) => a.action === 'support.status' && a.target === `support_ticket:${t.id}`)!;
+    expect(status.meta).toEqual({ userId: t.userId, from: 'open', to: 'in_progress' });
     expect(JSON.stringify(db().audit)).not.toContain(t.text);
   });
 
@@ -219,7 +219,8 @@ describe('ticket workflow (mock API)', () => {
     await user.click(screen.getByRole('button', { name: 'Send reply' }));
     const item = (await within(await history()).findByText('Second try.')).closest('li')!;
     expect(within(item).getByText('Failed')).toBeInTheDocument();
-    expect(within(item).getByText(/The provider refused the message/)).toBeInTheDocument();
+    // A code from the API (SEND_FAILED), never the provider's own message.
+    expect(within(item).getByText(/The email provider did not accept the reply/)).toBeInTheDocument();
     await user.click(within(item).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(within(item).getByText('Attempts: 2')).toBeInTheDocument());
   });
@@ -239,5 +240,83 @@ describe('ticket workflow (mock API)', () => {
     expect(screen.queryByRole('button', { name: 'Send reply' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add internal note' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it('notes and replies do not bump the version: a status change made on the old version still works', async () => {
+    const user = userEvent.setup();
+    const t = ticketBy('The Plans tab');
+    renderRoute(`/support/${t.id}`, { roles: ['support_agent'] });
+    await history();
+    const v = t.version;
+    // Someone else adds a note and a reply meanwhile (this page still holds version v).
+    const { supportApi } = await import('../api/support-api');
+    await supportApi.addNote(t.id, 'Looked at it.');
+    await supportApi.reply(t.id, 'On it.');
+    expect(t.version).toBe(v);
+    await user.selectOptions(screen.getByLabelText('Status'), 'waiting_for_user');
+    await waitFor(() => expect(t.status).toBe('waiting_for_user'));
+    expect(t.version).toBe(v + 1);
+  });
+
+  it('setting the value a ticket already has changes nothing (no version bump, no entry)', async () => {
+    const t = ticketBy('The Plans tab');
+    signInAs(['support_agent']);
+    const { supportApi } = await import('../api/support-api');
+    const before = t.timeline.length;
+    const view = await supportApi.setPriority(t.id, t.priority, t.version);
+    expect(view.version).toBe(t.version);
+    expect(t.timeline).toHaveLength(before);
+    expect(view.timeline).toHaveLength(before);
+  });
+
+  it('views carry assignee, assigneeName, version and a timeline of actor / actorName entries', async () => {
+    const t = db().support.tickets[1]!;
+    signInAs(['support_agent']);
+    const { supportApi } = await import('../api/support-api');
+    const view = await supportApi.get(t.id);
+    expect(view).toMatchObject({ assignee: staffId('support'), assigneeName: 'Yousef Ali', version: t.version });
+    expect(view.timeline[0]).toMatchObject({ type: 'created', actor: 'user', actorName: null });
+    expect(view.timeline.find((e) => e.type === 'reply')).toMatchObject({
+      actor: `staff:${staffId('support')}`,
+      actorName: 'Yousef Ali',
+      delivery: { status: 'pending', provider: null, attempts: 0, lastError: 'NO_EMAIL_PROVIDER', sentAt: null },
+    });
+    expect(await supportApi.deliveryStatus()).toEqual({ provider: 'none', canSend: false });
+  });
+
+  it('q finds a ticket by its ref in any case, with or without the prefix', async () => {
+    const t = db().support.tickets[4]!;
+    signInAs(['support_agent']);
+    const { supportApi } = await import('../api/support-api');
+    for (const q of [t.ref, t.ref.toLowerCase(), t.ref.slice(-6).toLowerCase()]) {
+      const page = await supportApi.list({ q });
+      expect(page.items.map((x) => x.id)).toEqual([t.id]);
+    }
+  });
+
+  it('refusals read clearly: ASSIGNEE_NOT_ELIGIBLE, REPLY_ALREADY_SENT, REPLY_NOT_FOUND, TICKET_TIMELINE_FULL', async () => {
+    const t = ticketBy('The Plans tab');
+    signInAs(['support_agent']);
+    const { supportApi } = await import('../api/support-api');
+    const { errorMessage } = await import('@/lib/api');
+    const fail = (p: Promise<unknown>) => p.then(() => null).catch((e: unknown) => e as { code: string });
+
+    const notEligible = await fail(supportApi.setAssignee(t.id, staffId('editor'), t.version));
+    expect(notEligible?.code).toBe('ASSIGNEE_NOT_ELIGIBLE');
+    expect(errorMessage(notEligible)).toMatch(/only active staff who can read support tickets/);
+
+    db().support.provider = 'mock-smtp';
+    const sent = await supportApi.reply(t.id, 'Hello.');
+    const reply = sent.timeline.at(-1)!;
+    expect(reply).toMatchObject({ type: 'reply', delivery: { status: 'sent', attempts: 1 } });
+    const again = await fail(supportApi.retryReply(t.id, reply.id));
+    expect(again?.code).toBe('REPLY_ALREADY_SENT');
+    expect(errorMessage(again)).toBe('This reply was already sent.');
+    expect((await fail(supportApi.retryReply(t.id, 'aaaaaaaaaaaaaaaaaaaaaaaa')))?.code).toBe('REPLY_NOT_FOUND');
+
+    while (t.timeline.length < 500) t.timeline.push({ ...t.timeline[0]!, id: `x${t.timeline.length}` });
+    const full = await fail(supportApi.addNote(t.id, 'One more.'));
+    expect(full?.code).toBe('TICKET_TIMELINE_FULL');
+    expect(errorMessage(full)).toMatch(/too much history/);
   });
 });

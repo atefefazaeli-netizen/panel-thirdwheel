@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import { supportApi } from './support-api';
-import type { TicketPriority, TicketQuery, TicketStatus } from './types';
+import type { SupportTicketDetail, TicketPriority, TicketQuery, TicketStatus } from './types';
 
 export const supportKeys = {
   all: ['support'] as const,
@@ -16,8 +16,20 @@ export const supportKeys = {
 export const useTickets = (q: TicketQuery) =>
   useQuery({ queryKey: supportKeys.list(q), queryFn: () => supportApi.list(q), placeholderData: keepPreviousData });
 
-export const useTicket = (id: string | null) =>
-  useQuery({ queryKey: supportKeys.ticket(id ?? ''), queryFn: () => supportApi.find(id!), enabled: !!id });
+/**
+ * One ticket. While a reply waits for an email provider that is configured (it is queued
+ * server-side), the ticket is read again every 5 seconds so Sent or Failed shows without a reload.
+ */
+export const useTicket = (id: string | null, pollPending = false) =>
+  useQuery({
+    queryKey: supportKeys.ticket(id ?? ''),
+    queryFn: () => supportApi.find(id!),
+    enabled: !!id,
+    refetchInterval: (q) =>
+      pollPending && q.state.data?.timeline.some((e) => e.type === 'reply' && e.delivery.status === 'pending')
+        ? 5_000
+        : false,
+  });
 
 export const useAssignees = () =>
   useQuery({ queryKey: supportKeys.assignees(), queryFn: supportApi.assignees, staleTime: 60_000 });
@@ -56,8 +68,8 @@ export type TicketChange =
   | { kind: 'assignee'; value: string | null };
 
 /**
- * Status, priority and assignee changes, each with the version this screen is based on. After any
- * answer (also a 409 TICKET_CONFLICT) the ticket is read again, so the page shows the latest.
+ * Status, priority and assignee changes, each with the version this screen is based on. The answer
+ * is the ticket as it is now; after a 409 TICKET_CONFLICT the ticket is read again.
  */
 export function useChangeTicket(id: string) {
   const qc = useQueryClient();
@@ -68,20 +80,28 @@ export function useChangeTicket(id: string) {
       return supportApi.setAssignee(id, change.value, version);
     },
     meta: { silent: true },
+    onSuccess: (t) => qc.setQueryData(supportKeys.ticket(id), t),
+    onError: () => void qc.invalidateQueries({ queryKey: supportKeys.ticket(id) }),
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: supportKeys.ticket(id) });
       void qc.invalidateQueries({ queryKey: supportKeys.lists() });
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
 
+/** Notes, replies and retries: each answers the ticket with its timeline (no version bump). */
 export function useTicketWrite(id: string) {
   const qc = useQueryClient();
-  const refresh = () => qc.invalidateQueries({ queryKey: supportKeys.ticket(id) });
+  const show = (t: SupportTicketDetail) => qc.setQueryData(supportKeys.ticket(id), t);
+  const reread = () => void qc.invalidateQueries({ queryKey: supportKeys.ticket(id) });
   return {
-    note: useMutation({ mutationFn: (text: string) => supportApi.addNote(id, text), onSuccess: refresh }),
-    reply: useMutation({ mutationFn: (text: string) => supportApi.reply(id, text), onSuccess: refresh }),
-    retry: useMutation({ mutationFn: (replyId: string) => supportApi.retryReply(id, replyId), onSettled: refresh }),
+    note: useMutation({ mutationFn: (text: string) => supportApi.addNote(id, text), onSuccess: show }),
+    reply: useMutation({ mutationFn: (text: string) => supportApi.reply(id, text), onSuccess: show }),
+    // REPLY_ALREADY_SENT / REPLY_NOT_FOUND: read the ticket again to show where the reply is.
+    retry: useMutation({
+      mutationFn: (replyId: string) => supportApi.retryReply(id, replyId),
+      onSuccess: show,
+      onError: reread,
+    }),
   };
 }
