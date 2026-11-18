@@ -344,12 +344,26 @@ export const BOARD_FIELDS: Record<BoardType, FieldSpec[]> = {
     subtitle,
     { key: 'words', label: 'Words to draw', kind: 'strings', itemLabel: 'Word', itemMax: 60, min: 2, max: 60 },
     { key: 'choices', label: 'Answers to choose from', kind: 'int', min: 2, max: 6 },
-    { key: 'perPlayer', label: 'Drawings per player', kind: 'int', min: 1, max: 10 },
+    {
+      key: 'perPlayer',
+      label: 'Drawings per player',
+      kind: 'int',
+      min: 1,
+      max: 10,
+      hint: 'Draw Me in 30 in Our league: each player scores +1 per word guessed. A draw scores nothing, no upset bonus.',
+    },
     { key: 'seconds', label: 'Seconds per drawing', kind: 'int', min: 10, max: 300 },
   ],
   'rock-paper-scissors': [
     subtitle,
-    { key: 'rounds', label: 'Rounds', kind: 'int', min: 1, max: 30 },
+    {
+      key: 'rounds',
+      label: 'Rounds',
+      kind: 'int',
+      min: 1,
+      max: 30,
+      hint: 'Our league (rock_paper_scissors): each player scores +1 per round won. A draw scores nothing, no upset bonus.',
+    },
     { key: 'dares', label: 'Dares for the loser', kind: 'strings', itemLabel: 'Dare', itemMax: 300, min: 1, max: 40 },
     { key: 'lose', label: 'Loser line', kind: 'text', required: true, max: 120, tokens: ['{loser}'] },
     {
@@ -611,80 +625,180 @@ const s = (v: unknown) => (typeof v === 'string' ? v : '');
 const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const objs = (v: unknown) => (Array.isArray(v) ? v.filter(isObj) : []);
 
-/** The text a board shows, grouped, as plain lines (placeholders stay as written). */
+/** Sample names for the preview: the app fills these from the couple's names. */
+export const PREVIEW_NAMES = { me: 'Sara', partner: 'Alex' } as const;
+
+/**
+ * Fills the app's placeholders with sample names so the preview reads as the couple sees it:
+ * {me} and {loser} = Sara, {p} = Alex; `extra` fills board tokens ({topic}, {n}, reel names).
+ */
+export function fillTokens(text: string, extra: Record<string, string> = {}): string {
+  const map: Record<string, string> = {
+    me: PREVIEW_NAMES.me,
+    p: PREVIEW_NAMES.partner,
+    loser: PREVIEW_NAMES.me,
+    ...extra,
+  };
+  return text.replace(/\{([a-zA-Z]+)\}/g, (m, k: string) => map[k] ?? map[k.toLowerCase()] ?? m);
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * The text a board shows, grouped, as plain lines: placeholders filled with sample names
+ * ({@link PREVIEW_NAMES}), counts in the titles, one example roll / pull, and the session length.
+ */
 export function boardPreview(board: BoardDeck, cards: readonly string[] = []): PreviewSection[] {
   const d = board.deck;
   const sec = (title: string, lines: string[]) => (lines.length ? [{ title, lines }] : []);
+  const t = (v: unknown, extra?: Record<string, string>) => fillTokens(s(v), extra);
+  const session = (...parts: (string | null)[]) => sec('Session', [parts.filter(Boolean).join(' · ')].filter(Boolean));
   switch (board.type) {
     case 'fill-the-blank':
       return [
-        ...sec('Prompt', [s(d.prompt)].filter(Boolean)),
-        ...sec('Cards', [...cards]),
-        ...sec('Words', [strs(d.words).join(' · ')].filter(Boolean)),
+        ...sec('Prompt', [t(d.prompt)].filter(Boolean)),
+        ...sec(
+          `Cards (${cards.length})`,
+          cards.map((c) => fillTokens(c)),
+        ),
+        ...sec('Answers', [strs(d.words).join(' · ')].filter(Boolean)),
         ...sec('Skip', strs(d.skips)),
       ];
     case 'swipe-to-choose':
-    case 'spin-the-bottle':
-      return [
-        ...sec('Asks', [s(d.ask)].filter(Boolean)),
-        ...sec('Questions', [...cards]),
-        ...sec('Answers', [strs(d.answers).join(' · ')].filter(Boolean)),
-      ];
-    case 'roll-and-play':
+    case 'spin-the-bottle': {
+      const ask = t(d.ask);
+      const n = num(d.cards);
       return [
         ...sec(
-          'Action die',
-          objs(d.actions).map((a) => `${s(a.word)}: ${s(a.prompt)}`),
+          `Questions (${cards.length})`,
+          cards.map((c) => fillTokens(ask ? `${ask} ${c.charAt(0).toLowerCase()}${c.slice(1)}` : c)),
         ),
         ...sec(
-          'Topic die',
-          objs(d.topics).map((t) => `${s(t.word)}: ${s(t.phrase)}`),
+          'Answers',
+          [
+            strs(d.answers)
+              .map((a) => fillTokens(a))
+              .join(' · '),
+          ].filter(Boolean),
         ),
-        ...sec('Lines', [s(d.hint), s(d.footnote)].filter(Boolean)),
+        ...session(n !== null ? plural(n, 'question') : null),
       ];
-    case 'spin-and-play':
+    }
+    case 'roll-and-play': {
+      const actions = objs(d.actions);
+      const topics = objs(d.topics);
+      const rerolls = num(d.rerolls);
+      const example = actions[0] && topics[0] ? t(actions[0].prompt, { topic: s(topics[0].phrase) }) : '';
       return [
         ...sec(
-          'Wheel',
-          objs(d.slices).map((x) => `${s(x.label)}: ${s(x.prompt)}`),
+          `Action die (${plural(actions.length, 'face')})`,
+          actions.map((a) => `${s(a.word)}: ${t(a.prompt, { topic: '(topic)' })}`),
         ),
-        ...sec('Lines', [s(d.hint)].filter(Boolean)),
-      ];
-    case 'date-slots':
-      return [
-        ...objs(d.reels).flatMap((r) => sec(s(r.label) || 'Reel', [strs(r.words).join(' · ')])),
-        ...sec('Result', [s(d.template)].filter(Boolean)),
-        ...sec('Lines', [s(d.hint)].filter(Boolean)),
-      ];
-    case 'scratch-and-do':
-      return [
-        ...sec('Lines', [s(d.headline), s(d.revealed)].filter(Boolean)),
         ...sec(
-          'Dares',
-          objs(d.dares).map((x) => `${s(x.tag)}: ${s(x.text)}`),
+          `Topic die (${plural(topics.length, 'face')})`,
+          topics.map((x) => `${s(x.word)}: ${s(x.phrase)}`),
+        ),
+        ...sec('Example roll', example ? [`${s(actions[0]!.word)} + ${s(topics[0]!.word)}: ${example}`] : []),
+        ...sec('Lines', [t(d.hint), t(d.footnote, { n: String(rerolls ?? 0) })].filter(Boolean)),
+        ...session(
+          num(d.rolls) !== null ? plural(num(d.rolls)!, 'roll') : null,
+          rerolls === null ? 'No re-rolls' : plural(rerolls, 're-roll'),
+          d.skin === 'spicy' ? 'Spicy skin' : null,
         ),
       ];
-    case 'pick-a-card':
+    }
+    case 'spin-and-play': {
+      const slices = objs(d.slices);
       return [
-        ...sec('Lines', [s(d.headline), s(d.picked), s(d.footer)].filter(Boolean)),
         ...sec(
-          'Cards',
-          objs(d.cards).map((x) => `${s(x.tag)}: ${s(x.text)}`),
+          `Wheel slices (${slices.length})`,
+          slices.map((x) => `${s(x.label)}: ${t(x.prompt)}`),
         ),
-        ...objs(d.decks).flatMap((x) => sec(s(x.name) || 'Extra deck', strs(x.words))),
+        ...sec('Lines', [t(d.hint)].filter(Boolean)),
+        ...session(num(d.spins) !== null ? plural(num(d.spins)!, 'spin') : null),
       ];
-    case 'beat-the-clock':
-      return sec('Challenges', strs(d.challenges));
-    case 'draw-it':
-      return sec('Words to draw', strs(d.words));
-    case 'rock-paper-scissors':
+    }
+    case 'date-slots': {
+      const reels = objs(d.reels);
+      const firsts = Object.fromEntries(reels.map((r) => [s(r.label).toLowerCase(), strs(r.words)[0] ?? '']));
+      const example = s(d.template) ? fillTokens(s(d.template), firsts) : '';
       return [
-        ...sec('Dares', strs(d.dares)),
+        ...reels.flatMap((r) =>
+          sec(`Reel ${s(r.label) || '?'} (${strs(r.words).length})`, [strs(r.words).join(' · ')]),
+        ),
+        ...sec('Example pull', example ? [example.charAt(0).toUpperCase() + example.slice(1)] : []),
+        ...sec('Lines', [t(d.hint)].filter(Boolean)),
+        ...session(num(d.pulls) !== null ? plural(num(d.pulls)!, 'pull') : null),
+      ];
+    }
+    case 'scratch-and-do': {
+      const dares = objs(d.dares);
+      return [
+        ...sec('Lines', [t(d.headline), t(d.revealed)].filter(Boolean)),
+        ...sec(
+          `Dares (${dares.length})`,
+          dares.map((x) => `${s(x.tag)}: ${t(x.text)}`),
+        ),
+        ...session(num(d.cards) !== null ? plural(num(d.cards)!, 'card') : null),
+      ];
+    }
+    case 'pick-a-card': {
+      const list = objs(d.cards);
+      return [
+        ...sec('Lines', [t(d.headline), t(d.picked), t(d.footer)].filter(Boolean)),
+        ...sec(
+          `Cards (${list.length})`,
+          list.map((x) => `${s(x.tag)}: ${t(x.text)}`),
+        ),
+        ...objs(d.decks).flatMap((x) =>
+          sec(`${s(x.name) || 'Extra deck'} (${strs(x.words).length} of ${num(x.cards) ?? '?'} words)`, strs(x.words)),
+        ),
+        ...session(
+          num(d.rounds) !== null ? plural(num(d.rounds)!, 'round') : null,
+          num(d.deal) !== null ? `${num(d.deal)} cards dealt` : null,
+        ),
+      ];
+    }
+    case 'beat-the-clock': {
+      const list = strs(d.challenges);
+      return [
+        ...sec(
+          `Challenges (${list.length})`,
+          list.map((c) => fillTokens(c)),
+        ),
+        ...session(
+          num(d.rounds) !== null ? plural(num(d.rounds)!, 'round') : null,
+          num(d.seconds) !== null ? `${num(d.seconds)} seconds each` : null,
+          num(d.target) !== null ? `target ${num(d.target)}` : null,
+        ),
+      ];
+    }
+    case 'draw-it': {
+      const list = strs(d.words);
+      return [
+        ...sec(`Words to draw (${list.length})`, list),
+        ...session(
+          num(d.perPlayer) !== null ? `${plural(num(d.perPlayer)!, 'drawing')} each` : null,
+          num(d.seconds) !== null ? `${num(d.seconds)} seconds` : null,
+          num(d.choices) !== null ? `${num(d.choices)} answers to pick from` : null,
+        ),
+      ];
+    }
+    case 'rock-paper-scissors': {
+      const list = strs(d.dares);
+      return [
+        ...sec(
+          `Dares for the loser (${list.length})`,
+          list.map((x) => fillTokens(x)),
+        ),
         ...sec(
           'Lines',
-          [s(d.lose), isObj(d.draw) ? [s(d.draw.title), s(d.draw.line)].filter(Boolean).join(' ') : ''].filter(Boolean),
+          [t(d.lose), isObj(d.draw) ? [t(d.draw.title), t(d.draw.line)].filter(Boolean).join(' ') : ''].filter(Boolean),
         ),
+        ...session(num(d.rounds) !== null ? plural(num(d.rounds)!, 'round') : null),
       ];
+    }
   }
 }
 
@@ -693,6 +807,70 @@ export function splitBlank(text: string): { before: string; after: string } | nu
   const i = text.indexOf(BLANK);
   if (i < 0) return null;
   return { before: text.slice(0, i).trim(), after: text.slice(i + BLANK.length).trim() };
+}
+
+/* ---------- Going live (app v2.5.0) ---------- */
+
+/** The backend's MIN_DECK_CARDS: a new-board deck needs this many cards to go live. */
+export const MIN_DECK_CARDS = 5;
+
+/**
+ * The backend's `deckSize` (content.ts, v2.5.0): cards in a new-board deck, counted the way approve
+ * counts them. Quiz cards, dice faces (the smaller die), wheel slices, the shortest reel, dares,
+ * cards, challenges. Null when the rule doesn't apply: Release 1 formats, Draw It and Rock Paper
+ * Scissors (its dares are only the loser's forfeit; the rounds are the game).
+ */
+export function deckSize(body: unknown): number | null {
+  const b = isObj(body) ? body : {};
+  const d = isObj(b.deck) ? b.deck : {};
+  switch (d.type) {
+    case 'fill-the-blank':
+    case 'swipe-to-choose':
+    case 'spin-the-bottle':
+      return len(b.cards);
+    case 'roll-and-play':
+      return Math.min(len(d.actions), len(d.topics));
+    case 'spin-and-play':
+      return len(d.slices);
+    case 'date-slots':
+      return Array.isArray(d.reels) && d.reels.length
+        ? Math.min(...d.reels.map((r) => len(isObj(r) ? r.words : undefined)))
+        : 0;
+    case 'scratch-and-do':
+      return len(d.dares);
+    case 'pick-a-card':
+      return len(d.cards);
+    case 'beat-the-clock':
+      return len(d.challenges);
+    default:
+      return null;
+  }
+}
+
+/** What the deck counts for the go-live rule, in words ("dares", "faces on the smaller die"…). */
+const SIZE_WHAT: Partial<Record<BoardType, string>> = {
+  'fill-the-blank': 'cards (Cards tab)',
+  'swipe-to-choose': 'questions (Cards tab)',
+  'spin-the-bottle': 'questions (Cards tab)',
+  'roll-and-play': 'faces on each die',
+  'spin-and-play': 'wheel slices',
+  'date-slots': 'words on the shortest reel',
+  'scratch-and-do': 'dares',
+  'pick-a-card': 'cards',
+  'beat-the-clock': 'challenges',
+};
+
+/** Why a board can't be approved yet (the server answers 409 DECK_TOO_SHORT), or null. */
+export function goLiveShortfall(body: unknown): { size: number; what: string; text: string } | null {
+  const size = deckSize(body);
+  if (size === null || size >= MIN_DECK_CARDS) return null;
+  const type = (isObj(body) && isObj(body.deck) ? body.deck.type : '') as BoardType;
+  const what = SIZE_WHAT[type] ?? 'cards';
+  return {
+    size,
+    what,
+    text: `Too short to go live: ${size} of the ${MIN_DECK_CARDS} ${what} it needs before a clinician can approve it.`,
+  };
 }
 
 /** The board deck and card texts of a saved snapshot (draft or live), or null when it plays no board. */
