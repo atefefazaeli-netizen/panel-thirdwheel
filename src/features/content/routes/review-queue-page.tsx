@@ -24,9 +24,23 @@ import type { ContentItem } from '../api/types';
 import { ApproveDialog } from '../components/approve-dialog';
 import { ConflictBanner } from '../components/conflict-banner';
 import { DiffView } from '../components/diff-view';
-import { HeldBadge, HeldBanner, NeedsReviewBadge, ProvenancePanel } from '../components/review-status';
-import { boardOfSnapshot, boardPreview, BOARD_LABEL, sessionShortfalls, shortfallText } from '../lib/boards';
-import { isConflict, sourceLabel } from '../lib/review';
+import {
+  DeckTooShortAlert,
+  HeldBadge,
+  HeldBanner,
+  NeedsReviewBadge,
+  ProvenancePanel,
+} from '../components/review-status';
+import {
+  boardOfSnapshot,
+  boardPreview,
+  BOARD_LABEL,
+  goLiveShortfall,
+  PREVIEW_NAMES,
+  sessionShortfalls,
+  shortfallText,
+} from '../lib/boards';
+import { deckTooShortMessage, isConflict, sourceLabel } from '../lib/review';
 import { REVIEW_SOURCES } from '../schemas/search';
 import { KIND_LABEL } from '../lib/labels';
 
@@ -157,6 +171,8 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
   // request changes carry its revision, and a change shows the conflict banner instead.
   const [pinned, setPinned] = React.useState<ContentItem>(first);
   const [conflict, setConflict] = React.useState(false);
+  // 409 DECK_TOO_SHORT: approve refused because the board has under 5 cards (app v2.5.0).
+  const [tooShort, setTooShort] = React.useState<string | null>(null);
   const moved = conflict || (!!item.data && item.data.rev !== pinned.rev);
   const d = pinned.draft;
   const inReview = d?.state === 'in_review';
@@ -168,6 +184,12 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
     } catch (e) {
       if (isConflict(e)) {
         setConflict(true);
+        return;
+      }
+      const short = deckTooShortMessage(e);
+      if (short) {
+        setTooShort(short);
+        setDialog(null);
         return;
       }
       toast.error(errorMessage(e));
@@ -235,6 +257,7 @@ function ReviewPane({ id, first }: { id: string; first: ContentItem }) {
         {moved && <ConflictBanner localJson={null} onReload={() => void reload()} />}
         {pinned.heldMatch && <HeldBanner match={pinned.heldMatch} />}
         {pinned.needsReview && <ProvenancePanel item={pinned} />}
+        {d && inReview && <DeckTooShortAlert body={d.snapshot.body} message={tooShort} itemId={pinned.id} />}
         {d && <BoardSummary snapshot={d.snapshot} />}
         {!inReview ? (
           <EmptyState title="Not in review any more" description="Someone already acted on this draft." />
@@ -277,11 +300,18 @@ function QueueFlags({ item }: { item: ContentItem | undefined }) {
   if (!item) return null;
   const b = boardOfSnapshot(item.draft?.snapshot);
   const short = b ? sessionShortfalls(b.board, b.cards.length).length > 0 : false;
+  const tooShort = !!goLiveShortfall(item.draft?.snapshot.body);
   return (
     <span className="mt-1 flex flex-wrap gap-1">
       <Badge variant="outline" className="text-[10px]">
         {sourceLabel(item.provenance?.source)}
       </Badge>
+      {tooShort && (
+        <Badge variant="outline" className="border-destructive/50 text-[10px]">
+          <AlertTriangleIcon className="size-3" />
+          Too short to go live
+        </Badge>
+      )}
       {short && (
         <Badge variant="outline" className="border-warning/50 text-[10px]">
           <AlertTriangleIcon className="size-3" />
@@ -308,7 +338,10 @@ function BoardSummary({ snapshot }: { snapshot: ContentItem['live'] }) {
         </Alert>
       ))}
       <section className="rounded-lg border p-3" aria-label="Board text">
-        <h3 className="mb-2 text-sm font-medium">{BOARD_LABEL[b.board.type]}: what the couple reads</h3>
+        <h3 className="text-sm font-medium">{BOARD_LABEL[b.board.type]}: what the couple reads</h3>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Sample names: {PREVIEW_NAMES.me} (you) and {PREVIEW_NAMES.partner} (partner).
+        </p>
         <div className="flex flex-col gap-3">
           {sections.map((sec) => (
             <div key={sec.title}>

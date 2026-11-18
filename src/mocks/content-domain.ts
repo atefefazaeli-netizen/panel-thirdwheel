@@ -14,6 +14,7 @@ import type {
   HeldEntry,
   HeldMatch,
 } from '@/features/content/api/types';
+import { deckSize, MIN_DECK_CARDS } from '@/features/content/lib/boards';
 import provenanceData from './data/content-provenance.json';
 
 /** The backend's content.provenance.ts (seed provenance and the held list), as JSON for the mock. */
@@ -413,6 +414,14 @@ export function approveDraft(
   if (!isClinician(actor)) fail('CLINICIAN_ONLY', 'Only a clinician can approve content.', 403);
   const d = item.draft;
   if (!d || d.state !== 'in_review') return fail('NOT_IN_REVIEW', 'Only a draft in review can be approved.', 409);
+  // v2.5.0: a new-board deck under MIN_DECK_CARDS can't go live (backend content.ts approveDraft).
+  const size = deckSize(d.snapshot.body);
+  if (size !== null && size < MIN_DECK_CARDS)
+    fail(
+      'DECK_TOO_SHORT',
+      `This deck has ${size} card${size === 1 ? '' : 's'}. Add at least ${MIN_DECK_CARDS} before it goes live.`,
+      409,
+    );
   const held = heldMatchOf(d.snapshot.catalog);
   if (held && !acknowledgeHeld)
     fail(

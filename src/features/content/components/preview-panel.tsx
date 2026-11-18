@@ -3,7 +3,16 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { categoryLabel, playsField, WHERE_LABEL } from '../lib/labels';
-import { boardPreview, BOARD_LABEL, parseBoardDeck, sessionShortfalls, shortfallText } from '../lib/boards';
+import {
+  boardPreview,
+  BOARD_LABEL,
+  fillTokens,
+  goLiveShortfall,
+  PREVIEW_NAMES,
+  parseBoardDeck,
+  sessionShortfalls,
+  shortfallText,
+} from '../lib/boards';
 import { deckEntries } from '../lib/preview';
 import type { CardForm, EditorValues, StepForm } from '../schemas/editor';
 
@@ -72,6 +81,7 @@ export function PreviewPanel({ kind }: { kind: string }) {
       )
     : [];
   const shortfalls = board ? sessionShortfalls(board, body.cards.length) : [];
+  const goLive = board ? goLiveShortfall({ deck: board.deck, cards: body.cards }) : null;
 
   return (
     <section aria-label="Phone preview" className="flex flex-col items-center gap-2">
@@ -132,7 +142,11 @@ export function PreviewPanel({ kind }: { kind: string }) {
               <p className="text-[11px] font-semibold tracking-wide text-[#626B7F] uppercase">
                 {BOARD_LABEL[board.type]}
               </p>
-              {body.intro && <p className="text-[12px] text-[#4E5A73]">{body.intro}</p>}
+              <p className="text-[10px] text-[#626B7F]">
+                Sample names: {PREVIEW_NAMES.me} (you) and {PREVIEW_NAMES.partner} (partner).
+              </p>
+              {body.intro && <p className="text-[12px] text-[#4E5A73]">{fillTokens(body.intro)}</p>}
+              {goLive && <p className="rounded-lg bg-[#FFE1E6] px-2 py-1 text-[11px] text-[#8A1230]">{goLive.text}</p>}
               {shortfalls.map((sf) => (
                 <p
                   key={`${sf.field}-${sf.deckName ?? ''}`}

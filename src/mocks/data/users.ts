@@ -199,6 +199,11 @@ export function seedUsers(): Map<string, MockUser> {
     if (a.subscription.state === 'plus')
       b.subscription = { ...b.subscription, state: 'paid_by_partner', plus: true, renewsAt: a.subscription.renewsAt };
   }
+  // v2.5.0: under-18 accounts are not blocked; Spicy is locked for their couple. Omar (Maya's
+  // partner) turned 17 this year, so the Maya and Omar couple shows "Spicy locked".
+  const omar = users.get(uid('omar'))!;
+  const y17 = new Date().getUTCFullYear() - 17;
+  omar.profile = omar.profile && { ...omar.profile, birthday: `${y17}-01-15`, spicy: false };
   // A suspended spam account and an admin grant.
   const spam = users.get(uid('sam'))!;
   spam.account = { ...spam.account, suspended: true, suspendedReason: 'Spam sign-ups from one device', tags: ['spam'] };

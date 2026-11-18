@@ -34,6 +34,10 @@ export const isSelfApproval = (item: Pick<ContentItem, 'draft'>, userId: string 
 
 export const isConflict = (e: unknown) => e instanceof ApiError && e.code === 'CONTENT_CONFLICT';
 
+/** 409 DECK_TOO_SHORT from approve (v2.5.0): the server's message, or null for any other error. */
+export const deckTooShortMessage = (e: unknown): string | null =>
+  e instanceof ApiError && e.code === 'DECK_TOO_SHORT' ? e.message : null;
+
 /** Who approved, in words: the seed is not a sign-off. */
 export const approverLabel = (id: string | null, email: string | null) =>
   id === 'workbook' ? SEEDED_LABEL : (email ?? id ?? 'Unknown');

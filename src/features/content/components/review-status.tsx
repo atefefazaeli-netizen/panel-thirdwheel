@@ -1,8 +1,11 @@
-import { CheckCircle2Icon, ShieldAlertIcon, StethoscopeIcon } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { CheckCircle2Icon, LayersIcon, ShieldAlertIcon, StethoscopeIcon } from 'lucide-react';
 import { StatusBadge } from '@/components/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/format';
 import type { ContentItem, HeldMatch } from '../api/types';
+import { BOARDS_WITH_BODY_CARDS, goLiveShortfall } from '../lib/boards';
 import { partLabel, SEEDED_LABEL } from '../lib/review';
 
 /** "Needs clinical review": live has parts no clinician has reviewed in this system. */
@@ -137,6 +140,46 @@ export function HeldBanner({ match }: { match: HeldMatch }) {
           ))}
         </ul>
         <p className="mt-1">Nothing is published automatically. A clinician must confirm it before approving.</p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
+ * A new-board deck under 5 cards can't go live (409 DECK_TOO_SHORT, app v2.5.0). Shown before
+ * approving (from the draft) and after the server refused (its message). Suggests adding cards in
+ * the editor; the draft then goes back for review as usual.
+ */
+export function DeckTooShortAlert({
+  body,
+  message,
+  itemId,
+  showLink = true,
+}: {
+  body: unknown;
+  /** The server's DECK_TOO_SHORT message, when approve was refused. */
+  message?: string | null;
+  itemId: string;
+  showLink?: boolean;
+}) {
+  const local = goLiveShortfall(body);
+  if (!local && !message) return null;
+  const type = (body as { deck?: { type?: string } } | null)?.deck?.type;
+  const tab = BOARDS_WITH_BODY_CARDS.some((t) => t === type) ? 'cards' : 'deck';
+  return (
+    <Alert variant={message ? 'destructive' : 'warning'} role={message ? 'alert' : undefined}>
+      <LayersIcon />
+      <AlertTitle>{message ? 'Not approved: the deck is too short' : 'Too short to go live'}</AlertTitle>
+      <AlertDescription>
+        <p>{message ?? local!.text}</p>
+        <p>Add cards in the editor and save, then send it for review again.</p>
+        {showLink && (
+          <Button variant="outline" size="sm" className="mt-1 w-fit" asChild>
+            <Link to="/content/$id" params={{ id: itemId }} search={{ tab }}>
+              Add cards in the {tab === 'cards' ? 'Cards' : 'Deck'} tab
+            </Link>
+          </Button>
+        )}
       </AlertDescription>
     </Alert>
   );

@@ -36,6 +36,7 @@ import {
 } from '../api/queries';
 import type { AppConfigAdmin, AppConfigBody, ConfigVersion } from '../api/types';
 import { configDiff } from '../lib/diff';
+import { featureDescription } from '../lib/notes';
 import {
   configFormSchema,
   fromForm,
@@ -198,7 +199,7 @@ function Editor({ data, onReload }: { data: AppConfigAdmin; onReload: () => void
                       control={form.control}
                       name={`features.${f.key}`}
                       label={f.label}
-                      description={f.description}
+                      description={featureDescription(f.key, f.description)}
                       disabled={!canEdit}
                     />
                   ))}

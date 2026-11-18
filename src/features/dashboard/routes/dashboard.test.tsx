@@ -11,7 +11,7 @@ describe('dashboard (mock API)', () => {
   it('shows the stats and the three previews for an Owner', async () => {
     renderRoute('/', { roles: ['owner'] });
     expect(await screen.findByText('Roll & Play')).toBeInTheDocument();
-    expect(within(card('Waiting for review')).getByText('14')).toBeInTheDocument();
+    expect(within(card('Waiting for review')).getByText('12')).toBeInTheDocument();
     expect(await screen.findByText('Failed webhook deliveries')).toBeInTheDocument();
     expect(await screen.findByText('priya@example.com')).toBeInTheDocument();
   });
@@ -53,6 +53,6 @@ describe('dashboard (mock API)', () => {
 
   it('puts counts on the sidebar', async () => {
     renderRoute('/', { roles: ['owner'] });
-    expect(await screen.findByLabelText('14 waiting')).toBeInTheDocument();
+    expect(await screen.findByLabelText('12 waiting')).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import drafts from '@/mocks/data/content-figma-drafts.json';
+import seeded from '@/mocks/data/content-figma-drafts.json';
+import merged from '@/test/fixtures/merged-figma-drafts.json';
 import type { ContentSnapshot } from '../api/types';
 import { deckIssues, formToSnapshot, snapshotToForm } from '../schemas/editor';
 import {
@@ -8,7 +9,10 @@ import {
   boardIssues,
   boardOfSnapshot,
   boardPreview,
+  deckSize,
+  goLiveShortfall,
   isBoardType,
+  MIN_DECK_CARDS,
   parseBoardDeck,
   sessionShortfalls,
   setAt,
@@ -18,7 +22,9 @@ import {
 } from './boards';
 
 type Draft = { id: string; code: string; catalog: ContentSnapshot['catalog']; body: ContentSnapshot['body'] };
-const all = drafts as unknown as Draft[];
+// The 10 seeded drafts (v2.5.2) plus the two merged into their Play games (D-4-08, D-1-07), whose
+// boards (spicy Roll & Play, Draw It) the published games now use.
+const all = [...seeded, ...merged] as unknown as Draft[];
 const draft = (code: string) => all.find((d) => d.code === code)!;
 const boardOf = (code: string) => boardOfSnapshot(draft(code))!;
 const withDeck = (code: string, fn: (deck: Record<string, unknown>) => Record<string, unknown>): BoardDeck => {
@@ -29,6 +35,7 @@ const messages = (b: BoardDeck, cards: string[] = []) => boardIssues(b, cards).m
 
 describe('board decks (Round 4 Figma drafts)', () => {
   it('reads every Figma draft as a board deck named after its screen, with no blocking problem', () => {
+    expect(seeded).toHaveLength(10);
     expect(all).toHaveLength(12);
     for (const d of all) {
       const b = boardOfSnapshot(d);
@@ -147,5 +154,52 @@ describe('board decks (Round 4 Figma drafts)', () => {
     form.body.cards[0]!.text = 'We ___ laugh about it later.';
     const card = formToSnapshot(form).body.cards![0]!;
     expect(card).toMatchObject({ text: 'We ___ laugh about it later.', before: 'We', after: 'laugh about it later.' });
+  });
+
+  it('counts a deck the way approve does (409 DECK_TOO_SHORT under 5)', () => {
+    const sizes = Object.fromEntries(all.map((d) => [d.code, deckSize(d.body)]));
+    expect(sizes).toEqual({
+      'Q-3-18': 5,
+      'Q-5-22': 4,
+      'Q-4-10': 1,
+      'D-1-05': 6,
+      'D-2-05': 8,
+      'D-1-06': 6,
+      'D-5-09': 3,
+      'D-6-04': 6,
+      'D-3-07': 1,
+      'D-1-08': null, // Rock Paper Scissors is exempt
+      'D-4-08': 6,
+      'D-1-07': null, // Draw It is not a counted board
+    });
+    expect(MIN_DECK_CARDS).toBe(5);
+    expect(
+      deckSize({ deck: { type: 'date-slots', reels: [{ words: ['a', 'b', 'c', 'd', 'e'] }, { words: ['x'] }] } }),
+    ).toBe(1);
+    expect(deckSize({ deck: { type: 'V-TX' }, cards: [] })).toBeNull();
+    expect(goLiveShortfall(draft('D-5-09').body)?.text).toBe(
+      'Too short to go live: 3 of the 5 dares it needs before a clinician can approve it.',
+    );
+    expect(goLiveShortfall(draft('Q-5-22').body)?.what).toBe('questions (Cards tab)');
+    expect(goLiveShortfall(draft('D-1-08').body)).toBeNull();
+  });
+
+  it('previews with sample names, counts, an example roll and the session length', () => {
+    const text = (code: string) =>
+      boardPreview(boardOf(code).board, boardOf(code).cards)
+        .map((s) => `${s.title}: ${s.lines.join(' | ')}`)
+        .join('\n');
+    for (const d of all) expect(text(d.code), d.code).not.toMatch(/\{(me|p|loser|topic|n)\}/);
+    expect(text('D-1-05')).toContain(
+      'Example roll: Tell + First date: Tell Alex about your first date, from your side.',
+    );
+    expect(text('D-1-05')).toContain('Session: 12 rolls · 2 re-rolls');
+    expect(text('D-4-08')).toContain('Session: 12 rolls · No re-rolls · Spicy skin');
+    expect(text('D-1-06')).toContain('Example pull: Slow dance, in the kitchen, for 10 seconds.');
+    expect(text('D-2-05')).toContain('Wheel slices (8): Compliment: Give Alex a compliment');
+    expect(text('Q-5-22')).toContain('Answers: Sara · Alex · Both · Neither');
+    expect(text('D-1-08')).toContain('Lines: Sara loses. Sara does it.');
+    expect(text('D-6-04')).toContain('Act it out (2 of 6 words)');
+    expect(text('D-3-07')).toContain('Session: 6 rounds · 60 seconds each · target 10');
   });
 });

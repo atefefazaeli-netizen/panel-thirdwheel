@@ -29,6 +29,19 @@ describe('content item editor (mock API)', () => {
     expect(await screen.findByText(/Live v3\. No draft\./)).toBeInTheDocument();
   });
 
+  it('DECK_TOO_SHORT (v2.5.0): approving a board under 5 cards shows the server message, nothing goes live', async () => {
+    const user = userEvent.setup();
+    renderRoute('/content/scratch-and-do', { roles: ['content_reviewer'] });
+    const b = await bar();
+    await user.click(within(b).getByRole('button', { name: 'Approve and publish' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Approve and publish' });
+    await user.click(within(dialog).getByRole('button', { name: 'Approve and publish' }));
+    expect(await screen.findByText('Not approved: the deck is too short')).toBeInTheDocument();
+    expect(screen.getByText('This deck has 3 cards. Add at least 5 before it goes live.')).toBeInTheDocument();
+    expect(screen.getByText('Add cards in the editor and save, then send it for review again.')).toBeInTheDocument();
+    expect(db().content.items.get('scratch-and-do')!.live).toBeNull();
+  });
+
   it('request changes needs a note', async () => {
     const user = userEvent.setup();
     renderRoute('/content/my-perfect-day', { roles: ['content_reviewer'] });

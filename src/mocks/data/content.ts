@@ -261,7 +261,8 @@ export function seedContent(): ContentState {
     ),
   );
   // Round 4 drafts from the Figma board (backend content.drafts.data.ts, migration
-  // 20261117-01-seed-figma-drafts): in review, never live, every part flagged.
+  // 20261117-01-seed-figma-drafts): in review, never live, every part flagged. v2.5.0: 10 drafts;
+  // D-4-08 spicy-dice-do and D-1-07 draw-it merged into their Play games (20261118-01).
   const figmaAt = daysAgo(1, 4);
   for (const f of figmaDrafts as unknown as (SeedItem & {
     provenance: {

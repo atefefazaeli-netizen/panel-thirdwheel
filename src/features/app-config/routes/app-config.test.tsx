@@ -93,6 +93,15 @@ describe('Remote Config page (mock API, reconciled with v2.0.0)', () => {
       'Photo uploads',
     ]);
     expect(within(fieldset).getByText(/Mic transcription and voice recordings/)).toBeInTheDocument();
+    // v2.5.0: what the server text doesn't say yet (AI dishes on aiCreate; the Third Ear cap is env).
+    expect(
+      within(fieldset).getByText(/also switches AI dishes \(Cook together recipes, POST ai\/dishes\)/),
+    ).toBeInTheDocument();
+    expect(
+      within(fieldset).getByText(
+        /Plus daily cap: 50 messages a day, set on the server \(THIRD_EAR_FAIR_USE_DAILY\), not here/,
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Spicy')).toBeNull();
   });
 
