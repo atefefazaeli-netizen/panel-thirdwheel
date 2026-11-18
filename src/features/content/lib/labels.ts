@@ -1,4 +1,5 @@
 import type { ContentListState, ContentPillar, DraftState } from '../api/types';
+import { isBoardType } from './boards';
 
 export const PILLAR_LABEL: Record<ContentPillar, string> = { quiz: 'Quiz', play: 'Play', do: 'Do' };
 
@@ -50,8 +51,14 @@ export const categoryLabel = (c: string | null | undefined) =>
     : '';
 
 /** Which body field the app plays for a kind (ADMIN_API.md › Content). */
-export function playsField(kind: string): 'deck' | 'cards' | 'steps' | 'how' {
+/**
+ * Which body field the item's screen plays. Round 4 boards (deck type in BOARD_TYPES, app v2.3.0)
+ * change it for Do cards: they play their board deck, not steps. Fill the blank and You or Me
+ * quizzes still play their cards; the deck holds the board's settings.
+ */
+export function playsField(kind: string, deckType?: string | null): 'deck' | 'cards' | 'steps' | 'how' {
   if (kind.startsWith('type-')) return 'deck';
+  if (isBoardType(deckType) && kind.startsWith('do-')) return 'deck';
   if (kind === 'quiz-turn' || kind === 'quiz-deck' || kind === 'quiz-solo') return 'cards';
   if (kind.startsWith('do-')) return 'steps';
   return 'how';
