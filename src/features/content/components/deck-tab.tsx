@@ -7,14 +7,36 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { emptyQuestion, parseStructuredDeck, structuredDeckText, structuredIssues, type DeckQuestion, type StructuredDeck } from '../lib/deck';
+import {
+  emptyQuestion,
+  parseStructuredDeck,
+  structuredDeckText,
+  structuredIssues,
+  type DeckQuestion,
+  type StructuredDeck,
+} from '../lib/deck';
+import { boardDeckText, parseBoardDeck } from '../lib/boards';
 import { deckIssues, type EditorValues } from '../schemas/editor';
+import { BoardDeckEditor } from './board-deck-editor';
 
-export function DeckTab({ readOnly, required }: { readOnly: boolean; required: boolean }) {
-  const { control } = useFormContext<EditorValues>();
+export function DeckTab({
+  readOnly,
+  required,
+  onOpenCards,
+}: {
+  readOnly: boolean;
+  required: boolean;
+  onOpenCards?: () => void;
+}) {
+  const { control, setValue } = useFormContext<EditorValues>();
   const deckText = useWatch({ control, name: 'body.deckText' });
-  const structured = React.useMemo(() => parseStructuredDeck(deckText), [deckText]);
-  const [view, setView] = React.useState<'questions' | 'json'>(structured ? 'questions' : 'json');
+  const cardForms = useWatch({ control, name: 'body.cards' });
+  const cards = React.useMemo(() => cardForms.map((c) => c.text), [cardForms]);
+  const board = React.useMemo(() => parseBoardDeck(deckText), [deckText]);
+  const structured = React.useMemo(() => (board ? null : parseStructuredDeck(deckText)), [board, deckText]);
+  const [view, setView] = React.useState<'questions' | 'board' | 'json'>(
+    board ? 'board' : structured ? 'questions' : 'json',
+  );
 
   const json = (
     <Controller
@@ -34,13 +56,36 @@ export function DeckTab({ readOnly, required }: { readOnly: boolean; required: b
           allowEmpty={!required}
           rows={22}
           validate={(v) => {
-            const issue = deckIssues(JSON.stringify(v), required);
+            const issue = deckIssues(JSON.stringify(v), required, cards);
             return issue ? [issue] : [];
           }}
         />
       )}
     />
   );
+  if (board)
+    return (
+      <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+        <TabsList aria-label="Deck editor">
+          <TabsTrigger value="board">Board</TabsTrigger>
+          <TabsTrigger value="json">JSON</TabsTrigger>
+        </TabsList>
+        <TabsContent value="board" className="mt-2">
+          <BoardDeckEditor
+            board={board}
+            cards={cards}
+            readOnly={readOnly}
+            onOpenCards={onOpenCards}
+            onChange={(deck) =>
+              setValue('body.deckText', boardDeckText(deck), { shouldDirty: true, shouldValidate: true })
+            }
+          />
+        </TabsContent>
+        <TabsContent value="json" className="mt-2">
+          {json}
+        </TabsContent>
+      </Tabs>
+    );
   if (!structured) return json;
   return (
     <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
@@ -67,7 +112,8 @@ function QuestionsEditor({ deck, readOnly }: { deck: StructuredDeck; readOnly: b
   const { setValue } = useFormContext<EditorValues>();
   const write = (entries: DeckQuestion[]) =>
     setValue('body.deckText', structuredDeckText({ ...deck, entries }), { shouldDirty: true, shouldValidate: true });
-  const patch = (i: number, p: Partial<DeckQuestion>) => write(deck.entries.map((e, k) => (k === i ? { ...e, ...p } : e)));
+  const patch = (i: number, p: Partial<DeckQuestion>) =>
+    write(deck.entries.map((e, k) => (k === i ? { ...e, ...p } : e)));
   const move = (i: number, d: -1 | 1) => {
     const next = [...deck.entries];
     [next[i], next[i + d]] = [next[i + d]!, next[i]!];
@@ -79,8 +125,8 @@ function QuestionsEditor({ deck, readOnly }: { deck: StructuredDeck; readOnly: b
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
-        {deck.type} deck, {deck.entries.length} {deck.listKey}. Card text from the workbook is clinician-cleared:
-        change it only with a clinician. Scales, rank items and other settings stay as they are (JSON tab).
+        {deck.type} deck, {deck.entries.length} {deck.listKey}. Card text from the workbook is clinician-cleared: change
+        it only with a clinician. Scales, rank items and other settings stay as they are (JSON tab).
       </p>
       {issue && (
         <p role="alert" className="text-sm text-destructive">
@@ -98,7 +144,14 @@ function QuestionsEditor({ deck, readOnly }: { deck: StructuredDeck; readOnly: b
                 </span>
                 {!readOnly && (
                   <div className="flex gap-1">
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move ${label.toLowerCase()} ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Move ${label.toLowerCase()} ${i + 1} up`}
+                      disabled={i === 0}
+                      onClick={() => move(i, -1)}
+                    >
                       <ArrowUpIcon />
                     </Button>
                     <Button
@@ -136,11 +189,23 @@ function QuestionsEditor({ deck, readOnly }: { deck: StructuredDeck; readOnly: b
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <Label htmlFor={`deck-intro-${i}`}>Intro line</Label>
-                  <Input id={`deck-intro-${i}`} value={e.intro} readOnly={readOnly} maxLength={1000} onChange={(ev) => patch(i, { intro: ev.target.value })} />
+                  <Input
+                    id={`deck-intro-${i}`}
+                    value={e.intro}
+                    readOnly={readOnly}
+                    maxLength={1000}
+                    onChange={(ev) => patch(i, { intro: ev.target.value })}
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label htmlFor={`deck-follow-${i}`}>Follow-up chip</Label>
-                  <Input id={`deck-follow-${i}`} value={e.followUp} readOnly={readOnly} maxLength={1000} onChange={(ev) => patch(i, { followUp: ev.target.value })} />
+                  <Input
+                    id={`deck-follow-${i}`}
+                    value={e.followUp}
+                    readOnly={readOnly}
+                    maxLength={1000}
+                    onChange={(ev) => patch(i, { followUp: ev.target.value })}
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-1">
@@ -167,7 +232,13 @@ function QuestionsEditor({ deck, readOnly }: { deck: StructuredDeck; readOnly: b
         })}
       </ol>
       {!readOnly && (
-        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => write([...deck.entries, emptyQuestion()])}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => write([...deck.entries, emptyQuestion()])}
+        >
           <PlusIcon />
           Add {label.toLowerCase()}
         </Button>

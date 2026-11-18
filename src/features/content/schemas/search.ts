@@ -14,7 +14,13 @@ export const contentSearchSchema = z.object({
 });
 export type ContentSearch = z.infer<typeof contentSearchSchema>;
 
-export const reviewSearchSchema = z.object({ id: optionalString, ...pageSearch });
+/** Review queue filter by provenance source ("panel" = made in the panel, no seed provenance). */
+export const REVIEW_SOURCES = ['figma-board', 'release1-bundle', 'panel'] as const;
+export const reviewSearchSchema = z.object({
+  id: optionalString,
+  source: z.enum(REVIEW_SOURCES).optional().catch(undefined),
+  ...pageSearch,
+});
 
 export const itemSearchSchema = z.object({
   tab: optionalEnum(['catalog', 'cards', 'steps', 'deck', 'history']),

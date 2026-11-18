@@ -94,7 +94,8 @@ function Editor({ item }: { item: ContentItem }) {
   const readOnly = !canEdit;
   const wf = workflowFor(item, [...permissions], { dirty: isDirty, valid: isValid, busy, stale });
   const blocker = useUnsavedGuard(isDirty && !readOnly);
-  const plays = playsField(item.kind);
+  const deckType = (editableSnapshot(item).body?.deck as { type?: unknown } | undefined)?.type;
+  const plays = playsField(item.kind, typeof deckType === 'string' ? deckType : null);
   const title = (editableSnapshot(item).catalog.title as string) || item.id;
   const categories = [
     ...new Set([
@@ -259,7 +260,11 @@ function Editor({ item }: { item: ContentItem }) {
             </TabsContent>
             <TabsContent value="deck" className="mt-2">
               <fieldset disabled={readOnly} className="min-w-0">
-                <DeckTab readOnly={readOnly} required={plays === 'deck'} />
+                <DeckTab
+                  readOnly={readOnly}
+                  required={plays === 'deck'}
+                  onOpenCards={() => void navigate({ search: { tab: 'cards' }, replace: true })}
+                />
               </fieldset>
             </TabsContent>
             <TabsContent value="history" className="mt-2">

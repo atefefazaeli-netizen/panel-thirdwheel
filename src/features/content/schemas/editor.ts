@@ -5,6 +5,7 @@
 // quizzes need a card). Keys the form does not edit are carried through untouched.
 import { z } from 'zod';
 import { parseJson } from '@/lib/json';
+import { firstBoardIssue, parseBoardDeck, splitBlank } from '../lib/boards';
 import { parseStructuredDeck, structuredIssues } from '../lib/deck';
 import { WHERES, type ContentCard, type ContentSnapshot, type DoPlanStep } from '../api/types';
 
@@ -110,7 +111,11 @@ export const editorSchema = (kind: string) =>
       base: z.custom<ContentSnapshot>(),
     })
     .superRefine((v, ctx) => {
-      const deck = deckIssues(v.body.deckText, kind.startsWith('type-'));
+      const deck = deckIssues(
+        v.body.deckText,
+        kind.startsWith('type-'),
+        v.body.cards.map((c) => c.text),
+      );
       if (deck) ctx.addIssue({ code: 'custom', path: ['body', 'deckText'], message: deck });
       if ((kind === 'quiz-turn' || kind === 'quiz-deck') && v.body.cards.length === 0) {
         ctx.addIssue({ code: 'custom', path: ['body', 'cards'], message: 'This kind plays cards: add at least one.' });
@@ -118,7 +123,11 @@ export const editorSchema = (kind: string) =>
     });
 export type EditorValues = z.infer<ReturnType<typeof editorSchema>>;
 
-export function deckIssues(deckText: string, required: boolean): string | null {
+/**
+ * The first deck problem that blocks saving, or null. `cards` = the item's card texts: Round 4
+ * boards (Fill the blank, You or Me) play the body cards with the deck's settings.
+ */
+export function deckIssues(deckText: string, required: boolean, cards: readonly string[] = []): string | null {
   if (!deckText.trim()) return required ? 'Type items play a deck: add one with a "type".' : null;
   const parsed = parseJson(deckText);
   if (!parsed.ok)
@@ -126,6 +135,8 @@ export function deckIssues(deckText: string, required: boolean): string | null {
   const v = parsed.value;
   if (!v || typeof v !== 'object' || Array.isArray(v)) return 'The deck must be an object.';
   if (typeof (v as Json).type !== 'string') return 'The deck needs a "type" (for example "V-YNM").';
+  const board = parseBoardDeck(deckText);
+  if (board) return firstBoardIssue(board, cards);
   const structured = parseStructuredDeck(deckText);
   return structured ? structuredIssues(structured) : null;
 }
@@ -325,7 +336,15 @@ export function formToSnapshot(v: Pick<EditorValues, 'catalog' | 'body' | 'base'
   put(body, bb, 'safety', b.safety, !b.safety);
   put(body, bb, 'followUp', b.followUp, !b.followUp);
   put(body, bb, 'need', b.need, b.need.length === 0);
-  put(body, bb, 'cards', b.cards.map(cardFromForm), b.cards.length === 0);
+  const board = parseBoardDeck(b.deckText);
+  // Fill the blank cards keep `before` / `after` (what the board shows around the blank) in step
+  // with the card text, so an edited sentence never shows the old halves.
+  const cards = b.cards.map(cardFromForm).map((card) => {
+    if (board?.type !== 'fill-the-blank' || !('before' in card || 'after' in card)) return card;
+    const halves = splitBlank(card.text);
+    return halves ? { ...card, ...halves } : card;
+  });
+  put(body, bb, 'cards', cards, b.cards.length === 0);
   put(body, bb, 'steps', b.steps.map(stepFromForm), b.steps.length === 0);
   if (b.deckText.trim()) {
     const parsed = parseJson(b.deckText);
