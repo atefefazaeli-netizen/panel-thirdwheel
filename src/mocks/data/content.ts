@@ -20,6 +20,7 @@ import {
 import { daysAgo } from '../utils';
 import { staffId } from './staff';
 import seed from './content-seed.json';
+import figmaDrafts from './content-figma-drafts.json';
 
 /** The seed's editor and clinician (staff accounts `editor` and `reviewer`, data/staff.ts). */
 export const LEAD: Actor = {
@@ -35,6 +36,10 @@ export const DOCTOR: Actor = {
   permissions: ['content.read', 'content.approve', 'content.unpublish'],
 };
 const N8N: Actor = { id: 'apikey:n8n-sheets', email: null, permissions: [] };
+
+/** The backend's FIGMA_DRAFT_NOTE (content.ts). */
+export const FIGMA_DRAFT_NOTE =
+  'From Figma 1775:7, needs clinician review. Held as a draft until a clinician approves it.';
 
 type SeedItem = {
   id: string;
@@ -255,5 +260,60 @@ export function seedContent(): ContentState {
       daysAgo(0, 5),
     ),
   );
+  // Round 4 drafts from the Figma board (backend content.drafts.data.ts, migration
+  // 20261117-01-seed-figma-drafts): in review, never live, every part flagged.
+  const figmaAt = daysAgo(1, 4);
+  for (const f of figmaDrafts as unknown as (SeedItem & {
+    provenance: {
+      source: 'figma-board';
+      cleared: string[];
+      needsReview: { part: string; reason: string }[];
+      notes: string[];
+    };
+  })[]) {
+    const snapshot: ContentSnapshot = { catalog: f.catalog, body: f.body };
+    state.items.set(f.id, {
+      id: f.id,
+      code: f.code,
+      pillar: f.pillar,
+      kind: f.kind,
+      live: null,
+      liveVersion: 0,
+      livePublishedAt: null,
+      liveApprovedBy: null,
+      liveApprovedByEmail: null,
+      liveRevision: 0,
+      draft: {
+        snapshot,
+        state: 'in_review',
+        note: FIGMA_DRAFT_NOTE,
+        by: 'figma',
+        byEmail: null,
+        at: figmaAt,
+        source: 'panel',
+      },
+      retired: false,
+      rev: 0,
+      provenance: {
+        source: f.provenance.source,
+        cleared: [...f.provenance.cleared],
+        flagged: f.provenance.needsReview.map((n) => ({ ...n })),
+        needsReview: f.provenance.needsReview.map((n) => ({ ...n })),
+        notes: [...f.provenance.notes],
+        clearedBy: null,
+      },
+      createdAt: figmaAt,
+      updatedAt: figmaAt,
+    });
+    state.changes.push({
+      itemId: f.id,
+      action: 'seeded',
+      by: 'figma',
+      byEmail: null,
+      note: FIGMA_DRAFT_NOTE,
+      at: figmaAt,
+      meta: { state: 'in_review', summary: ['new'] },
+    });
+  }
   return state;
 }

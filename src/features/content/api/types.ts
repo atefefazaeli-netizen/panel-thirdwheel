@@ -110,9 +110,13 @@ export interface ReviewNeed {
   reason: string;
 }
 
-/** Seeded items: where the text comes from (ADMIN_API.md › Content › Provenance). */
+/**
+ * Seeded items: where the text comes from (ADMIN_API.md › Content › Provenance). `figma-board` =
+ * a Round 4 item drawn on Figma page 1775:7 (app v2.3.0), seeded as a draft in review, never live.
+ */
+export type ProvenanceSource = 'release1-bundle' | 'figma-board';
 export interface ContentProvenance {
-  source: 'release1-bundle';
+  source: ProvenanceSource;
   cleared: string[];
   flagged: ReviewNeed[];
   needsReview: ReviewNeed[];

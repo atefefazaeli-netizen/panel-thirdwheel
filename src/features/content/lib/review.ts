@@ -16,8 +16,17 @@ export const PART_LABEL: Record<string, string> = {
   how: 'How it plays',
   howItPlays: 'How it plays',
   safety: 'Safety line',
+  all: 'Whole item',
 };
 export const partLabel = (part: string) => PART_LABEL[part] ?? part;
+
+/** Where an item's text comes from (provenance source), in words. */
+export const SOURCE_LABEL: Record<string, string> = {
+  'release1-bundle': 'Release 1 bundle',
+  'figma-board': 'Figma board',
+};
+export const sourceLabel = (source: string | null | undefined) =>
+  source ? (SOURCE_LABEL[source] ?? source) : 'Made in the panel';
 
 /** The approver is the draft's last editor (allowed; recorded as self-approved). */
 export const isSelfApproval = (item: Pick<ContentItem, 'draft'>, userId: string | null | undefined) =>
@@ -39,7 +48,20 @@ export function detailsToFieldErrors(details: readonly string[]): {
 } {
   const mapped: { path: string; message: string }[] = [];
   const unmapped: string[] = [];
-  const CATALOG = new Set(['title', 'meta', 'emoji', 'where', 'category', 'sub', 'minutes', 'duration', 'vibes', 'play', 'only', 'price']);
+  const CATALOG = new Set([
+    'title',
+    'meta',
+    'emoji',
+    'where',
+    'category',
+    'sub',
+    'minutes',
+    'duration',
+    'vibes',
+    'play',
+    'only',
+    'price',
+  ]);
   const BODY = new Set(['intro', 'howItPlays', 'how', 'safety', 'followUp', 'need', 'howYouPlay']);
   for (const d of details) {
     const i = d.indexOf(':');

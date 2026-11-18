@@ -22,6 +22,35 @@ export function HeldBadge({ className }: { className?: string }) {
 export function ProvenancePanel({ item }: { item: ContentItem }) {
   const p = item.provenance;
   if (!p && !item.liveSeeded) return null;
+  if (p?.source === 'figma-board' && item.needsReview)
+    return (
+      <Alert className="border-warning/40 bg-warning-soft/40">
+        <StethoscopeIcon />
+        <AlertTitle>From the Figma board: needs clinical review</AlertTitle>
+        <AlertDescription>
+          <p>
+            {item.liveVersion > 0
+              ? `Live is version ${item.liveVersion}. `
+              : 'Not live: the app does not show it until a clinician approves it. '}
+            This text was drawn on the design board, not in the clinician-cleared workbook.
+          </p>
+          <ul className="mt-1 list-disc pl-4" aria-label="Parts that need clinical review">
+            {p.needsReview.map((n) => (
+              <li key={n.part}>
+                <span className="font-medium">{partLabel(n.part)}</span>: {n.reason}
+              </li>
+            ))}
+          </ul>
+          {p.notes.length > 0 && (
+            <ul className="mt-1 list-disc pl-4" aria-label="Notes from the board">
+              {p.notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
   if (p && item.needsReview)
     return (
       <Alert className="border-warning/40 bg-warning-soft/40">
