@@ -16,9 +16,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/format';
-import { useUser } from '../api/queries';
+import { usePartner, useUser } from '../api/queries';
 import { UserActions } from '../components/user-actions';
 import { DUR_LABEL, KIDS_LABEL, LIVING_LABEL, PLAN_LABEL, plusSourceLabel } from '../lib/labels';
+import { coupleSpicyLocked, SPICY_LOCKED_HELP } from '../lib/spicy';
 
 const route = getRouteApi('/_app/users/$id');
 
@@ -46,6 +47,7 @@ export function UserDetailPage() {
 function UserDetail() {
   const { id } = route.useParams();
   const q = useUser(id);
+  const partner = usePartner(q.data?.couple?.partner.userId);
   if (q.error)
     return <ErrorState error={q.error} title="Could not load this account" onRetry={() => void q.refetch()} />;
   if (!q.data)
@@ -58,6 +60,15 @@ function UserDetail() {
     );
   const { account, profile, couple, subscription, safety, support } = q.data;
   const down = new Set(q.data.unavailable ?? []);
+  // Spicy lock (v2.5.0): from this person's birthday and, when linked, the partner's. Unknown (null)
+  // while either profile can't be read, so the panel never guesses.
+  const spicyLocked: boolean | null = !profile
+    ? null
+    : !couple
+      ? coupleSpicyLocked([profile.birthday])
+      : partner.data?.profile
+        ? coupleSpicyLocked([profile.birthday, partner.data.profile.birthday])
+        : null;
 
   return (
     <>
@@ -171,7 +182,9 @@ function UserDetail() {
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>
-            <CardDescription>What staff may see. No cycle data, things to avoid, answers or chats.</CardDescription>
+            <CardDescription>
+              What staff may see. No cycle data, things to avoid, answers, quiz analyses, Your story text or chats.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {profile ? (
@@ -194,7 +207,7 @@ function UserDetail() {
                     'Situation',
                     `${LIVING_LABEL[profile.sit.living] ?? profile.sit.living} · ${KIDS_LABEL[profile.sit.kids] ?? profile.sit.kids}`,
                   ],
-                  ['Spicy', profile.spicy ? 'On' : 'Off'],
+                  ['Spicy', spicyLocked ? <SpicyLocked key="s" /> : profile.spicy ? 'On' : 'Off'],
                   ['Onboarded', profile.onboarded ? 'Yes' : 'Not finished'],
                 ]}
               />
@@ -230,6 +243,10 @@ function UserDetail() {
                     ],
                     ['Partner email', couple.partner.email],
                     ['Linked', formatDateTime(couple.linkedAt)],
+                    [
+                      'Spicy for the couple',
+                      spicyLocked === null ? 'Not available' : spicyLocked ? <SpicyLocked key="s" /> : 'Not locked',
+                    ],
                     [
                       'Couple id',
                       <span key="c" className="font-mono text-xs">
@@ -309,5 +326,17 @@ function UserDetail() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Read-only "Spicy locked" (v2.5.0). Says nothing about who or how old: only what support needs. */
+function SpicyLocked() {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span>
+        <Badge variant="outline">Spicy locked</Badge>
+      </span>
+      <span className="text-xs text-muted-foreground">{SPICY_LOCKED_HELP}</span>
+    </span>
   );
 }

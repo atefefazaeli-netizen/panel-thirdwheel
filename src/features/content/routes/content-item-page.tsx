@@ -34,13 +34,19 @@ import { ContentStateBadge } from '../components/content-state-badge';
 import { DeckTab } from '../components/deck-tab';
 import { HistoryTab } from '../components/history-tab';
 import { PreviewPanel } from '../components/preview-panel';
-import { HeldBadge, HeldBanner, NeedsReviewBadge, ProvenancePanel } from '../components/review-status';
+import {
+  DeckTooShortAlert,
+  HeldBadge,
+  HeldBanner,
+  NeedsReviewBadge,
+  ProvenancePanel,
+} from '../components/review-status';
 import { StepsTab } from '../components/steps-tab';
 import { WorkflowBar } from '../components/workflow-bar';
 import { editableSnapshot, useContentEditor } from '../hooks/use-content-editor';
 import { useUnsavedGuard } from '../hooks/use-unsaved-guard';
 import { contentState, KIND_LABEL, PILLAR_LABEL, playsField } from '../lib/labels';
-import { detailsToFieldErrors, isConflict } from '../lib/review';
+import { deckTooShortMessage, detailsToFieldErrors, isConflict } from '../lib/review';
 import { workflowFor } from '../lib/workflow';
 import { formToSnapshot, snapshotBytes, LIMITS, type EditorValues } from '../schemas/editor';
 
@@ -80,6 +86,8 @@ function Editor({ item }: { item: ContentItem }) {
   const { isDirty, isValid } = useFormState({ control: form.control });
   const [problems, setProblems] = React.useState<string[] | null>(null);
   const [reloading, setReloading] = React.useState(false);
+  // 409 DECK_TOO_SHORT from approve (app v2.5.0): the server's message until the next write.
+  const [tooShort, setTooShort] = React.useState<string | null>(null);
 
   const save = useSaveDraft(item.id);
   const discard = useDiscardDraft(item.id);
@@ -114,10 +122,16 @@ function Editor({ item }: { item: ContentItem }) {
     try {
       const saved = await fn(baseRev);
       resetTo(saved);
+      setTooShort(null);
       if (done) toast.success(done);
     } catch (e) {
       if (isConflict(e)) {
         markConflict();
+        return;
+      }
+      const short = deckTooShortMessage(e);
+      if (short) {
+        setTooShort(short);
         return;
       }
       toast.error(errorMessage(e));
@@ -205,6 +219,7 @@ function Editor({ item }: { item: ContentItem }) {
       {stale && <ConflictBanner localJson={localJson} onReload={() => void reload()} reloading={reloading} />}
       {item.heldMatch && <HeldBanner match={item.heldMatch} />}
       <ProvenancePanel item={item} />
+      {tooShort && <DeckTooShortAlert body={null} message={tooShort} itemId={item.id} showLink={false} />}
       {readOnly && (
         <Alert>
           <InfoIcon />

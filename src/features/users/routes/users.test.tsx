@@ -164,4 +164,18 @@ describe('unavailable parts are told apart from empty ones', () => {
     expect(screen.queryByText('No profile yet')).not.toBeInTheDocument();
     expect(screen.queryByText('Not linked with a partner.')).not.toBeInTheDocument();
   });
+
+  it('Spicy locked (v2.5.0): read only, from both birthdays, never naming who or an age', async () => {
+    renderRoute(`/users/${uid('maya')}`);
+    expect(await screen.findAllByText('Spicy locked')).toHaveLength(2);
+    expect(screen.getAllByText(/it unlocks on its own/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/minor|under 18|under-18|too young/i)).toBeNull();
+    // No control changes it: the page has no Spicy switch.
+    expect(screen.queryByRole('switch', { name: /spicy/i })).toBeNull();
+    cleanup();
+
+    renderRoute(`/users/${uid('sara')}`);
+    expect(await screen.findByText('Not locked')).toBeInTheDocument();
+    expect(screen.queryByText('Spicy locked')).toBeNull();
+  });
 });

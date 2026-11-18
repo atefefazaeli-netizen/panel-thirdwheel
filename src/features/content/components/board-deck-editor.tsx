@@ -10,10 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   BOARD_FIELDS,
   BOARD_LABEL,
-  BOARDS_WITH_BODY_CARDS,
   boardIssues,
+  BOARDS_WITH_BODY_CARDS,
   emptyItem,
   getAt,
+  goLiveShortfall,
   sessionShortfalls,
   setAt,
   shortfallText,
@@ -62,6 +63,7 @@ export function BoardDeckEditor({
     return { list, byPath: m };
   }, [board, cards]);
   const shortfalls = sessionShortfalls(board, cards.length);
+  const goLive = goLiveShortfall({ deck: board.deck, cards: cards.map((text) => ({ text })) });
   const ctx: Ctx = {
     deck: board.deck,
     readOnly,
@@ -77,6 +79,16 @@ export function BoardDeckEditor({
         {usesCards ? 'The questions are the Cards tab; this sets how the board plays them. ' : ''}
         Text from the Figma board is not clinician-cleared yet: a clinician approves it in the review queue.
       </p>
+      {goLive && (
+        <Alert variant="warning">
+          <AlertTriangleIcon />
+          <AlertTitle>Too short to go live</AlertTitle>
+          <AlertDescription>
+            <p>{goLive.text}</p>
+            <p>You can save it; approving it waits for the cards.</p>
+          </AlertDescription>
+        </Alert>
+      )}
       {shortfalls.map((s) => (
         <Alert key={`${s.field}-${s.deckName ?? ''}`} variant="warning">
           <AlertTriangleIcon />

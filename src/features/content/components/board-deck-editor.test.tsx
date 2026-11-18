@@ -2,14 +2,15 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
-import drafts from '@/mocks/data/content-figma-drafts.json';
+import seeded from '@/mocks/data/content-figma-drafts.json';
+import merged from '@/test/fixtures/merged-figma-drafts.json';
 import type { ContentSnapshot } from '../api/types';
 import { boardOfSnapshot, type BoardDeck } from '../lib/boards';
 import { BoardDeckEditor } from './board-deck-editor';
 
 type Json = Record<string, unknown>;
 const start = (code: string) => {
-  const d = (drafts as unknown as (ContentSnapshot & { code: string })[]).find((x) => x.code === code)!;
+  const d = ([...seeded, ...merged] as unknown as (ContentSnapshot & { code: string })[]).find((x) => x.code === code)!;
   return boardOfSnapshot(structuredClone(d))!;
 };
 
