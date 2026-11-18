@@ -1,0 +1,943 @@
+[
+ {
+  "id": "picking-your-battles",
+  "code": "Q-3-18",
+  "pillar": "quiz",
+  "kind": "quiz-turn",
+  "catalog": {
+   "id": "picking-your-battles",
+   "kind": "quiz-turn",
+   "pillar": "quiz",
+   "title": "Picking Your Battles",
+   "meta": "Under 5 min · One phone",
+   "where": [
+    "anywhere",
+    "home",
+    "apart"
+   ],
+   "category": "us",
+   "sub": "Picking Your Battles",
+   "minutes": 5,
+   "duration": "Under 5 min",
+   "vibes": [],
+   "play": "one-phone",
+   "code": "Q-3-18",
+   "screen": "fill-the-blank",
+   "price": null
+  },
+  "body": {
+   "intro": "Finish the sentence so it’s true for you.",
+   "cards": [
+    {
+     "text": "We ___ agree on what’s worth talking about.",
+     "before": "We",
+     "after": "agree on what’s worth talking about."
+    },
+    {
+     "text": "When I let something go, it ___ stays let go.",
+     "before": "When I let something go, it",
+     "after": "stays let go."
+    },
+    {
+     "text": "I ___ can tell when something is bothering my partner.",
+     "before": "I",
+     "after": "can tell when something is bothering my partner."
+    },
+    {
+     "text": "Small things ___ pile up between us.",
+     "before": "Small things",
+     "after": "pile up between us."
+    },
+    {
+     "text": "We ___ raise things before they turn into fights.",
+     "before": "We",
+     "after": "raise things before they turn into fights."
+    }
+   ],
+   "deck": {
+    "type": "fill-the-blank",
+    "prompt": "Finish the sentence so it’s true for you.",
+    "words": [
+     "Always",
+     "Usually",
+     "Sometimes",
+     "Rarely",
+     "Never"
+    ],
+    "skips": [
+     "Not applicable",
+     "Prefer not to answer"
+    ]
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1775:8, 1778:309, 1817:95083), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Card 3 says \"my partner\": clinician content keeps it until the rewrite (PROJECT_CONTEXT §8 open item).",
+    "Conflict wording may belong to Clear the air, which the workbook holds back; filed under Us until a clinician decides."
+   ]
+  }
+ },
+ {
+  "id": "you-or-me-family-duty",
+  "code": "Q-5-22",
+  "pillar": "quiz",
+  "kind": "quiz-turn",
+  "catalog": {
+   "id": "you-or-me-family-duty",
+   "kind": "quiz-turn",
+   "pillar": "quiz",
+   "title": "You or Me? Family Duty",
+   "meta": "Under 5 min · One phone",
+   "where": [
+    "anywhere",
+    "home",
+    "out",
+    "apart"
+   ],
+   "category": "real-life",
+   "sub": "In-laws & Family",
+   "minutes": 5,
+   "duration": "Under 5 min",
+   "vibes": [],
+   "play": "one-phone",
+   "code": "Q-5-22",
+   "screen": "swipe-to-choose",
+   "price": null
+  },
+  "body": {
+   "intro": "Who’s most likely to…? Swipe the card to the person.",
+   "cards": [
+    {
+     "text": "Be the one family rings in a crisis"
+    },
+    {
+     "text": "Remember every relative’s birthday"
+    },
+    {
+     "text": "Play peacemaker when a family argument kicks off"
+    },
+    {
+     "text": "Reply first in the family group chat"
+    }
+   ],
+   "deck": {
+    "type": "swipe-to-choose",
+    "ask": "Who’s most likely to…",
+    "answers": [
+     "{me}",
+     "{p}",
+     "Both",
+     "Neither"
+    ],
+    "cards": 10
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:317, 1785:31530, 1785:26934), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Figma shows 4 of the 10 questions (counter 3 / 10)."
+   ]
+  }
+ },
+ {
+  "id": "you-or-me-extra-spicy",
+  "code": "Q-4-10",
+  "pillar": "quiz",
+  "kind": "quiz-turn",
+  "catalog": {
+   "id": "you-or-me-extra-spicy",
+   "kind": "quiz-turn",
+   "pillar": "quiz",
+   "title": "You or Me? Extra Spicy",
+   "meta": "Under 5 min · One phone",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "spicy",
+   "sub": "You or Me",
+   "minutes": 5,
+   "duration": "Under 5 min",
+   "vibes": [],
+   "play": "one-phone",
+   "code": "Q-4-10",
+   "screen": "spin-the-bottle",
+   "only": "spicy",
+   "price": null,
+   "sensitive": true
+  },
+  "body": {
+   "intro": "Tap who the bottle should point at.",
+   "cards": [
+    {
+     "text": "Suggest something new in bed"
+    }
+   ],
+   "deck": {
+    "type": "spin-the-bottle",
+    "ask": "Who’s most likely to…",
+    "answers": [
+     "Both",
+     "{p}",
+     "Neither",
+     "{me}"
+    ],
+    "cards": 10
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:317, 1785:31484, 1785:19965), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Figma shows 1 of the 10 questions (counter 4 / 10)."
+   ]
+  }
+ },
+ {
+  "id": "roll-and-play",
+  "code": "D-1-05",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "roll-and-play",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Roll & Play",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "playful"
+   ],
+   "code": "D-1-05",
+   "screen": "roll-and-play",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Roll both dice and do what they say together. Take turns rolling, 12 rolls in all.",
+   "deck": {
+    "type": "roll-and-play",
+    "skin": "light",
+    "subtitle": "Date night",
+    "rolls": 12,
+    "rerolls": 2,
+    "actions": [
+     {
+      "word": "Tell",
+      "prompt": "Tell {p} about {topic}, from your side."
+     },
+     {
+      "word": "Ask",
+      "prompt": "Ask {p} one question about {topic} you never asked."
+     },
+     {
+      "word": "Show",
+      "prompt": "Show {p} a photo of {topic}. Explain it."
+     },
+     {
+      "word": "Rate",
+      "prompt": "Rate {topic} from 1 to 10. {p} guesses first."
+     },
+     {
+      "word": "Act",
+      "prompt": "Act out {topic}. No words. {p} guesses."
+     },
+     {
+      "word": "Toast",
+      "prompt": "Raise a glass. Make a 20-second toast to {topic}."
+     }
+    ],
+    "topics": [
+     {
+      "word": "First date",
+      "phrase": "your first date"
+     },
+     {
+      "word": "Kid you",
+      "phrase": "you as a kid"
+     },
+     {
+      "word": "A trip",
+      "phrase": "a trip you loved"
+     },
+     {
+      "word": "Home",
+      "phrase": "your first home together"
+     },
+     {
+      "word": "Friends",
+      "phrase": "the friend who knows you best"
+     },
+     {
+      "word": "Us",
+      "phrase": "the two of you, five years from now"
+     }
+    ],
+    "hint": "Then {p} rolls for you",
+    "footnote": "Tap the dice to re-roll · {n} left"
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:313, 1785:19686, 1820:19479), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Prompts are action × topic templates from the live canvas; some pairs read oddly (Show a photo of the two of you, five years from now)."
+   ]
+  }
+ },
+ {
+  "id": "spicy-dice-do",
+  "code": "D-4-08",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "spicy-dice-do",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Spicy Dice",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "spicy",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "romantic",
+    "playful"
+   ],
+   "code": "D-4-08",
+   "screen": "roll-and-play",
+   "only": "spicy",
+   "fromQuiz": false,
+   "price": null,
+   "sensitive": true,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Roll, then do what the dice say. Pass is always fine, no reason needed.",
+   "deck": {
+    "type": "roll-and-play",
+    "skin": "spicy",
+    "rolls": 12,
+    "rerolls": null,
+    "points": false,
+    "actions": [
+     {
+      "word": "Kiss",
+      "prompt": "Kiss {p}’s {topic}. Slowly."
+     },
+     {
+      "word": "Breathe",
+      "prompt": "Breathe softly on {p}’s {topic}. Nothing else."
+     },
+     {
+      "word": "Trace",
+      "prompt": "Trace a word on {p}’s {topic}. They guess it."
+     },
+     {
+      "word": "Massage",
+      "prompt": "Massage {p}’s {topic} with your eyes closed."
+     },
+     {
+      "word": "Whisper",
+      "prompt": "Whisper what you like about {p}’s {topic}."
+     },
+     {
+      "word": "Tease",
+      "prompt": "Tease {p}’s {topic}. No hands allowed."
+     }
+    ],
+    "topics": [
+     {
+      "word": "Neck",
+      "phrase": "neck"
+     },
+     {
+      "word": "Ear",
+      "phrase": "ear"
+     },
+     {
+      "word": "Hand",
+      "phrase": "hand"
+     },
+     {
+      "word": "Back",
+      "phrase": "back"
+     },
+     {
+      "word": "Shoulder",
+      "phrase": "shoulder"
+     },
+     {
+      "word": "Lips",
+      "phrase": "lips"
+     }
+    ],
+    "hint": "30 seconds · {p} keeps time",
+    "footnote": "No points in spicy. Pass any roll, no reason needed."
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:313, 1785:25451, 1820:19846), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Duplicates the Play game Spicy Dice (G-4-03) in the Spicy tile once both are live: decide whether one replaces the other."
+   ]
+  }
+ },
+ {
+  "id": "spin-and-play",
+  "code": "D-2-05",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "spin-and-play",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Spin & Play",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "playful",
+    "romantic"
+   ],
+   "code": "D-2-05",
+   "screen": "spin-and-play",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Spin the wheel. {me} answers or does what it lands on, then you swap.",
+   "deck": {
+    "type": "spin-and-play",
+    "subtitle": "Know me",
+    "spins": 8,
+    "slices": [
+     {
+      "label": "Compliment",
+      "prompt": "Give {p} a compliment you have never said out loud."
+     },
+     {
+      "label": "Hot take",
+      "prompt": "Share a hot take about the two of you. {p} rates it."
+     },
+     {
+      "label": "Story",
+      "prompt": "Tell the story of the moment you knew you liked {p}."
+     },
+     {
+      "label": "Impression",
+      "prompt": "Do your best impression of {p} saying goodnight."
+     },
+     {
+      "label": "Slow dance",
+      "prompt": "Pick a song. Slow dance in the kitchen until it ends."
+     },
+     {
+      "label": "Rate it",
+      "prompt": "Rate tonight so far. Say what would make it a 10."
+     },
+     {
+      "label": "Confess",
+      "prompt": "Confess a tiny habit {p} hasn’t noticed yet."
+     },
+     {
+      "label": "Wildcard",
+      "prompt": "{p} picks any slice for you."
+     }
+    ],
+    "hint": "Then swap"
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:313, 1785:30834, 1820:20186), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "date-slots",
+  "code": "D-1-06",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "date-slots",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Date Slots",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "playful"
+   ],
+   "code": "D-1-06",
+   "screen": "date-slots",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Pull the lever. {me} does the move, the place and the time it lands on, then you swap.",
+   "deck": {
+    "type": "date-slots",
+    "subtitle": "Just for laughs",
+    "pulls": 10,
+    "reels": [
+     {
+      "label": "MOVE",
+      "words": [
+       "Slow dance",
+       "Compliment",
+       "Tell a secret",
+       "Shoulder rub",
+       "Do a toast",
+       "Copy my moves"
+      ]
+     },
+     {
+      "label": "WHERE",
+      "words": [
+       "in the kitchen",
+       "on the sofa",
+       "by the window",
+       "on the floor",
+       "on the balcony",
+       "in bed"
+      ]
+     },
+     {
+      "label": "FOR",
+      "words": [
+       "10 seconds",
+       "30 seconds",
+       "1 minute",
+       "one song",
+       "3 minutes",
+       "until someone laughs"
+      ]
+     }
+    ],
+    "template": "{move}, {where}, for {for}.",
+    "hint": "Jackpot if {p} laughs first"
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:313, 1785:32900, 1820:20482), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "scratch-and-do",
+  "code": "D-5-09",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "scratch-and-do",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Scratch & Do",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "playful"
+   ],
+   "code": "D-5-09",
+   "screen": "scratch-and-do",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Scratch the foil to find a small dare you both do, right now.",
+   "deck": {
+    "type": "scratch-and-do",
+    "subtitle": "Real life",
+    "cards": 8,
+    "headline": "What’s under the foil?",
+    "revealed": "Here’s your mission.",
+    "grid": {
+     "cols": 9,
+     "rows": 6,
+     "opensAt": 30
+    },
+    "dares": [
+     {
+      "tag": "Together · 2 min",
+      "minutes": 2,
+      "text": "Plan tomorrow’s breakfast in two minutes without saying the word eggs."
+     },
+     {
+      "tag": "Out loud",
+      "text": "Each name three tiny things the other did this week that made life easier."
+     },
+     {
+      "tag": "Phones down",
+      "text": "Recreate your first selfie together. Same faces, same angle."
+     }
+    ]
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:314, 1784:8543), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Figma has 3 dares for an 8-card session: they repeat."
+   ]
+  }
+ },
+ {
+  "id": "pick-a-card",
+  "code": "D-6-04",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "pick-a-card",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Pick a Card",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "romantic",
+    "playful"
+   ],
+   "code": "D-6-04",
+   "screen": "pick-a-card",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Three cards face down. Pick one and you both answer it out loud.",
+   "deck": {
+    "type": "pick-a-card",
+    "subtitle": "Future us",
+    "rounds": 9,
+    "deal": 3,
+    "headline": "Pick one. No peeking.",
+    "picked": "Your card.",
+    "footer": "Pick a card. Both do it.",
+    "cards": [
+     {
+      "tag": "Ten years out",
+      "text": "Describe a perfectly ordinary Tuesday, ten years from now."
+     },
+     {
+      "tag": "Make your case",
+      "text": "Pick a city to live in for one year. You have 30 seconds to sell it."
+     },
+     {
+      "tag": "Start this year",
+      "text": "Name one tradition you want the two of you to start this year."
+     },
+     {
+      "tag": "Bucket list",
+      "text": "One thing we have to do before we turn 50. Go."
+     },
+     {
+      "tag": "Home",
+      "text": "Describe the kitchen of our dream home in three details."
+     },
+     {
+      "tag": "Tiny promise",
+      "text": "Promise one small thing you will do for each other next month."
+     }
+    ],
+    "decks": [
+     {
+      "id": "act-it-out",
+      "name": "Act it out",
+      "game": "G-1-07",
+      "headline": "Pick one. Act it out.",
+      "tag": "Act this out",
+      "footer": "No words. No pointing at things in the room.",
+      "cards": 6,
+      "seconds": 45,
+      "words": [
+       "Meeting the parents",
+       "Our first date"
+      ]
+     }
+    ]
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:314, 1785:16338, 1823:22626, 1823:22627), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Figma has 6 cards for 9 rounds of 3. The Act It Out deck names 2 of its 6 words; G-1-07 has its own workbook prompts."
+   ]
+  }
+ },
+ {
+  "id": "beat-the-clock",
+  "code": "D-3-07",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "beat-the-clock",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Beat the Clock",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "romantic",
+    "playful"
+   ],
+   "code": "D-3-07",
+   "screen": "beat-the-clock",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "60 seconds to name 10 things you love about each other.",
+   "deck": {
+    "type": "beat-the-clock",
+    "subtitle": "Us",
+    "rounds": 6,
+    "seconds": 60,
+    "target": 10,
+    "challenges": [
+     "Name 10 things you love about each other. Take turns. No repeats."
+    ]
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:314, 1785:26421), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Figma has 1 challenge for 6 rounds."
+   ]
+  }
+ },
+ {
+  "id": "draw-it",
+  "code": "D-1-07",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "draw-it",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Draw It",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home",
+    "apart"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "playful"
+   ],
+   "code": "D-1-07",
+   "screen": "draw-it",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Draw it. {p} picks the answer on their phone.",
+   "deck": {
+    "type": "draw-it",
+    "subtitle": "Things only we know",
+    "perPlayer": 3,
+    "seconds": 60,
+    "choices": 4,
+    "words": [
+     "Meeting the parents",
+     "Our first apartment",
+     "Your snoring",
+     "The dog we want",
+     "That terrible haircut",
+     "Our wedding cake"
+    ]
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:315, 1785:25615, 1817:96450), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": []
+  }
+ },
+ {
+  "id": "rock-paper-scissors",
+  "code": "D-1-08",
+  "pillar": "do",
+  "kind": "do-home",
+  "catalog": {
+   "id": "rock-paper-scissors",
+   "kind": "do-home",
+   "pillar": "do",
+   "title": "Rock Paper Scissors",
+   "meta": "Under 1 hr · At home",
+   "place": "Home",
+   "where": [
+    "anywhere",
+    "home"
+   ],
+   "category": "nights-in",
+   "minutes": 45,
+   "duration": "Under 1 hr",
+   "vibes": [
+    "playful"
+   ],
+   "code": "D-1-08",
+   "screen": "rock-paper-scissors",
+   "fromQuiz": false,
+   "price": null,
+   "budget": 0
+  },
+  "body": {
+   "intro": "Pick in secret, pass the phone. The loser does the dare.",
+   "deck": {
+    "type": "rock-paper-scissors",
+    "subtitle": "Loser does it",
+    "rounds": 10,
+    "dares": [
+     "Give a 2-minute foot rub. No complaining."
+    ],
+    "lose": "{loser} loses. {loser} does it.",
+    "draw": {
+     "title": "Draw! Go again.",
+     "line": "Same pick. Great minds."
+    }
+   }
+  },
+  "provenance": {
+   "source": "figma-board",
+   "cleared": [],
+   "needsReview": [
+    {
+     "part": "all",
+     "reason": "From Figma 1775:7, needs clinician review. Written on the design board (1779:315, 1785:25661), not in the clinician-cleared workbook."
+    }
+   ],
+   "notes": [
+    "Figma has 1 dare for 10 rounds."
+   ]
+  }
+ }
+]

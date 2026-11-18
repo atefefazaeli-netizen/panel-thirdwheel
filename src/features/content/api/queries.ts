@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, useQueries } from '@tanstack/react-query';
 import { contentApi } from './content-api';
 import type { ContentImportItem, ContentItem, ContentListQuery, ContentSnapshot, CreateContentInput } from './types';
 
@@ -19,6 +19,15 @@ export const useContentList = (q: ContentListQuery) =>
 
 export const useContentFacets = () =>
   useQuery({ queryKey: contentKeys.facets(), queryFn: contentApi.facets, staleTime: 5 * 60_000 });
+
+/**
+ * Details for several items at once (the review queue needs each draft's provenance, which list
+ * rows don't carry). Same cache entries as useContentItem.
+ */
+export const useContentItems = (ids: readonly string[]) =>
+  useQueries({
+    queries: ids.map((id) => ({ queryKey: contentKeys.item(id), queryFn: () => contentApi.get(id) })),
+  });
 
 export const useContentItem = (id: string) =>
   useQuery({ queryKey: contentKeys.item(id), queryFn: () => contentApi.get(id) });

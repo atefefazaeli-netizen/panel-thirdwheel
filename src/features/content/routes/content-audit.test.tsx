@@ -161,7 +161,7 @@ describe('content audit (mock API)', () => {
     const rows = within(table)
       .getAllByRole('row')
       .filter((r) => within(r).queryAllByRole('cell').length > 0);
-    expect(rows.length).toBe(30);
+    expect(rows.length).toBe(39); // 30 seeded items held for review + 9 Do drafts from the Figma board
     for (const r of rows) expect(within(r).getByText('Needs clinical review')).toBeInTheDocument();
   });
 

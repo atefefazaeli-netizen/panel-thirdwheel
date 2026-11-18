@@ -3,6 +3,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { categoryLabel, playsField, WHERE_LABEL } from '../lib/labels';
+import { boardPreview, BOARD_LABEL, parseBoardDeck, sessionShortfalls, shortfallText } from '../lib/boards';
 import { deckEntries } from '../lib/preview';
 import type { CardForm, EditorValues, StepForm } from '../schemas/editor';
 
@@ -61,8 +62,16 @@ export function PreviewPanel({ kind }: { kind: string }) {
   const { control } = useFormContext<EditorValues>();
   const catalog = useWatch({ control, name: 'catalog' });
   const body = useWatch({ control, name: 'body' });
-  const plays = playsField(kind);
-  const deck = plays === 'deck' ? deckEntries(body.deckText) : [];
+  const board = parseBoardDeck(body.deckText);
+  const plays = playsField(kind, board?.type);
+  const deck = plays === 'deck' && !board ? deckEntries(body.deckText) : [];
+  const boardSections = board
+    ? boardPreview(
+        board,
+        body.cards.map((c) => c.text),
+      )
+    : [];
+  const shortfalls = board ? sessionShortfalls(board, body.cards.length) : [];
 
   return (
     <section aria-label="Phone preview" className="flex flex-col items-center gap-2">
@@ -118,7 +127,36 @@ export function PreviewPanel({ kind }: { kind: string }) {
           tabIndex={0}
           aria-label="Preview content"
         >
-          {plays === 'cards' &&
+          {board && (
+            <div className="flex flex-col gap-3" aria-label="Board text">
+              <p className="text-[11px] font-semibold tracking-wide text-[#626B7F] uppercase">
+                {BOARD_LABEL[board.type]}
+              </p>
+              {body.intro && <p className="text-[12px] text-[#4E5A73]">{body.intro}</p>}
+              {shortfalls.map((sf) => (
+                <p
+                  key={`${sf.field}-${sf.deckName ?? ''}`}
+                  className="rounded-lg bg-[#FFF4D6] px-2 py-1 text-[11px] text-[#6B4E00]"
+                >
+                  {shortfallText(sf)}
+                </p>
+              ))}
+              {boardSections.map((sec) => (
+                <section key={sec.title} className="flex flex-col gap-1 border-b border-[#EAEFF6] pb-2 last:border-0">
+                  <h4 className="text-[11px] font-semibold text-[#626B7F]">{sec.title}</h4>
+                  <ul className="flex flex-col gap-1">
+                    {sec.lines.map((line, i) => (
+                      <li key={i} className="text-[13px] leading-snug">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+          {!board &&
+            plays === 'cards' &&
             (body.cards.length ? (
               <ol className="flex flex-col gap-4">
                 {body.cards.map((card, i) => (
@@ -133,7 +171,7 @@ export function PreviewPanel({ kind }: { kind: string }) {
             ) : (
               <p className="text-[12px] text-[#626B7F]">No cards yet.</p>
             ))}
-          {plays === 'steps' && (
+          {!board && plays === 'steps' && (
             <div className="flex flex-col gap-3">
               {body.intro && <p className="text-[12px] text-[#4E5A73]">{body.intro}</p>}
               {body.steps.length ? (
@@ -149,7 +187,8 @@ export function PreviewPanel({ kind }: { kind: string }) {
               )}
             </div>
           )}
-          {plays === 'deck' &&
+          {!board &&
+            plays === 'deck' &&
             (deck.length ? (
               <ol className="flex flex-col gap-4">
                 {deck.map((e, i) => (
