@@ -274,7 +274,7 @@ export function UserActions({ user }: { user: AdminUserDetail }) {
         open={dialog === 'unlink'}
         onOpenChange={close}
         title="Unlink this couple?"
-        description={`The same as ${who} ending the relationship in the app: shared plans and Plus sharing stop for both.`}
+        description={`The same as ${who} ending the relationship in the app: shared plans (every plan except surprise bookings) and Plus sharing stop for both, and their AI dishes, AI quiz analyses and shared Your story text are deleted for both.`}
         confirmLabel="Unlink partner"
         cancelLabel="Keep them linked"
         destructive
@@ -287,7 +287,7 @@ export function UserActions({ user }: { user: AdminUserDetail }) {
         open={dialog === 'delete'}
         onOpenChange={close}
         title="Delete this account?"
-        description="This erases the account the same way self-deletion does. It cannot be undone."
+        description="This erases the account the same way self-deletion does, including their AI dishes, AI quiz analyses and Your story text. It cannot be undone."
         confirmText={user.account.email ?? id}
         inputLabel="Type the email to confirm:"
         confirmLabel="Delete account"

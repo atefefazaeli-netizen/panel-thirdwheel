@@ -14,6 +14,10 @@ export const useUserList = (q: UserListQuery) =>
 
 export const useUser = (id: string) => useQuery({ queryKey: userKeys.detail(id), queryFn: () => usersApi.get(id) });
 
+/** The partner's account (same cache as their page), for parts derived from both, like the Spicy lock. */
+export const usePartner = (id: string | null | undefined) =>
+  useQuery({ queryKey: userKeys.detail(id ?? ''), queryFn: () => usersApi.get(id!), enabled: !!id });
+
 /** Account actions refresh the person, their partner and the lists. */
 function useUserAction<V, R>(fn: (v: V) => Promise<R>) {
   const qc = useQueryClient();
